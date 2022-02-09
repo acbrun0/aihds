@@ -5,4 +5,7 @@ edition = "2021"
 
 [dependencies]
 csv = "1.1"
-serde = { version = "1", features = ["derive"] }
+clap = { version = "3.0", features = ["derive"]}
+linfa = "0.5"
+linfa-svm = "0.5"
+ndarray = "0.15"
