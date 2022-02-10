@@ -13,8 +13,9 @@ type TrainValSet = (Dataset<f64, bool>, Dataset<f64, bool>);
 #[derive(Parser)]
 #[clap(author, version, about)]
 struct Args {
+    /// Paths to the datasets required for training the model, separated by ','
     #[clap(short, long)]
-    path: String,
+    paths: String,
 }
 
 // struct Packet {
@@ -29,17 +30,19 @@ fn scale(x: f64, min: f64, max: f64) -> f64 {
     (x - min) / (max - min)
 }
 
-fn load_dataset(paths: &[&Path]) -> Result<TrainValSet, Error> {
+fn load_dataset(paths: Vec<&Path>) -> Result<TrainValSet, Error> {
     let (mut x_train, mut y_train) = (Vec::new(), Vec::new());
     let (mut x_test, mut y_test) = (Vec::new(), Vec::new());
 
     for path in paths {
         let (mut features, mut labels) = (Vec::new(), Vec::new());
         for dataset_type in ["train", "test"] {
+            let cur_path = &format!("{}/{}.csv", path.display(), dataset_type);
+            println!("Loading {}", cur_path);
             for record in csv::ReaderBuilder::new()
                 .has_headers(false)
                 .flexible(true)
-                .from_path(&format!("{}/{}.csv", path.display(), dataset_type))?
+                .from_path(cur_path)?
                 .records()
             {
                 let fields: StringRecord = record?;
@@ -105,17 +108,16 @@ fn load_dataset(paths: &[&Path]) -> Result<TrainValSet, Error> {
 }
 
 fn main() -> linfa_svm::error::Result<()> {
-    println!("Loading dataset...");
-    let (train, valid) = match load_dataset(&[
-        Path::new("./datasets/car_hacking/DoS"),
-        Path::new("./datasets/car_hacking/fuzzy"),
-    ]) {
+    let args = Args::parse();
+    let paths : Vec<&str> = args.paths.split(',').collect();
+    
+    let (train, valid) = match load_dataset(paths.iter().map(|p| Path::new(p)).collect()) {
         Ok(dataset) => dataset,
         Err(why) => panic!("Could not read file: {}", why),
     };
 
-    println!("Loaded train dataset: {:?}", train.records.shape());
-    println!("Loaded validation dataset: {:?}", valid.records.shape());
+    println!("Loaded train dataset with shape: {:?}", train.records.shape());
+    println!("Loaded validation dataset with shape: {:?}", valid.records.shape());
 
     println!("Training model...");
     let model = Svm::<f64, bool>::params().fit(&train)?;
