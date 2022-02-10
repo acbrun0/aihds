@@ -8,6 +8,8 @@ csv = "1.1"
 clap = { version = "3.0", features = ["derive"]}
 linfa = "0.5"
 linfa-svm = {version = "0.5", features = ["serde"]}
+linfa-trees = {version = "0.5", features = ["serde"]}
+linfa-logistic = "0.5"
 ndarray = "0.15"
 bincode = "1.3"
 serde = "1.0"

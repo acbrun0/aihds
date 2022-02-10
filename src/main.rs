@@ -3,7 +3,8 @@ mod model;
 
 use clap::Parser;
 use linfa::prelude::*;
-use model::svm;
+// use model::logistic;
+use model::{svm, trees};
 use std::path::Path;
 
 #[derive(Parser)]
@@ -15,7 +16,7 @@ struct Args {
     /// Path to model to be loaded
     #[clap(short, long)]
     load: Option<String>,
-    /// Type of model to train (supported: SVM)
+    /// Type of model to train (supported: SVM, trees)
     #[clap(short, long)]
     model: Option<String>,
 }
@@ -33,6 +34,7 @@ fn main() -> Result<(), Error> {
             modeltype = args.model.unwrap();
             match modeltype.to_lowercase().as_str() {
                 "svm" => (),
+                "trees" => (),
                 _ => panic!("Unsupported model type: {}", modeltype),
             }
         }
@@ -53,34 +55,64 @@ fn main() -> Result<(), Error> {
     );
 
     // Load or train model
-    let model;
     if args.load.is_none() {
         match modeltype.to_lowercase().as_str() {
             "svm" => {
                 println!("Training model...");
-                model = match svm::train(&train) {
+                let model = match svm::train(&train) {
                     Ok(model) => model,
                     Err(why) => panic!("Error training model: {}", why),
                 };
+                // Test model
+                println!("Testing model...");
+                let pred = model.predict(&valid);
+                println!("Accuracy: {:?}", pred.confusion_matrix(&valid)?.accuracy());
+                // Save model
                 match model::save(&model, Path::new("models/svm")) {
                     Ok(_) => (),
                     Err(why) => println!("Could not save model: {}", why),
                 }
             }
+            "trees" => {
+                println!("Training model...");
+                let model = match trees::train(&train) {
+                    Ok(model) => model,
+                    Err(why) => panic!("Error training model: {}", why),
+                };
+                // Test model
+                println!("Testing model...");
+                let pred = model.predict(&valid);
+                println!("Accuracy: {:?}", pred.confusion_matrix(&valid)?.accuracy());
+                // Save model
+                match model::save(&model, Path::new("models/trees")) {
+                    Ok(_) => (),
+                    Err(why) => println!("Could not save model: {}", why),
+                }
+            }
+            // "logistic" => {
+            //     println!("Training model...");
+            //     let model = match logistic::train(&train) {
+            //         Ok(model) => model,
+            //         Err(why) => panic!("Error training model: {}", why),
+            //     };
+            //     // Test model
+            //     println!("Testing model...");
+            //     let pred = model.predict(&valid);
+            //     println!("Accuracy: {:?}", pred.confusion_matrix(&valid)?.accuracy());
+            // }
             _ => panic!("Unsupported model type: {}", modeltype),
         }
     } else {
         println!("Loading model...");
-        model = match svm::load(Path::new(&args.load.unwrap())) {
+        let model = match svm::load(Path::new(&args.load.unwrap())) {
             Ok(m) => m,
             Err(why) => panic!("Could not load model: {}", why),
-        }
+        };
+        // Test model
+        println!("Testing model...");
+        let pred = model.predict(&valid);
+        println!("Accuracy: {:?}", pred.confusion_matrix(&valid)?.accuracy());
     }
-
-    // Test model
-    println!("Testing model...");
-    let pred = model.predict(&valid);
-    println!("Accuracy: {:?}", pred.confusion_matrix(&valid)?.accuracy());
 
     Ok(())
 }
