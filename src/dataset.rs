@@ -1,9 +1,9 @@
-use csv::Error;
-use csv::StringRecord;
+use csv::{StringRecord, Writer};
 use linfa::dataset::Dataset;
+use ndarray::prelude::*;
 use ndarray::{Array1, Array2};
-use std::char;
 use std::collections::HashMap;
+use std::iter::Iterator;
 use std::path::Path;
 
 struct Packet {
@@ -12,7 +12,22 @@ struct Packet {
     data: [u8; 8],
 }
 
-const WINDOW_SIZE: u16 = 1000;
+const WINDOW_SIZE: u16 = 1500;
+
+pub fn write_features(path: &Path, dataset: &Dataset<f64, bool>) -> Result<(), csv::Error> {
+    let mut wtr = Writer::from_path(path)?;
+    for (i, record) in dataset.records.outer_iter().enumerate() {
+        wtr.write_record(&[
+            record[0].to_string(),
+            record[1].to_string(),
+            record[2].to_string(),
+            record[3].to_string(),
+            dataset.targets.slice(s![i, 0]).to_string(),
+        ])?;
+    }
+    wtr.flush()?;
+    Ok(())
+}
 
 // Extracts:
 //  - Number of distinct IDs;
@@ -35,7 +50,7 @@ fn extract_features(packets: &[Packet]) -> [f64; 4] {
 
     // Get difference between timestamps
     ts = ts.windows(2).map(|w| w[1] - w[0]).collect::<Vec<f64>>();
-    ts.swap_remove(0);
+    ts[0] = 0.0;
 
     for (_, val) in feat.iter_mut() {
         // Get difference between timestamps of packets with the same ID
@@ -45,7 +60,12 @@ fn extract_features(packets: &[Packet]) -> [f64; 4] {
         } else {
             val.0[0] = 0.0;
         }
-        avg_time.push(val.0.iter().sum::<f64>() / val.0.len() as f64);
+
+        avg_time.push(if !val.0.is_empty() {
+            val.0.iter().sum::<f64>() / val.0.len() as f64
+        } else {
+            0.0
+        });
 
         // Get average entropy of packets with the same ID
         let n_packets = val.1.len();
@@ -69,11 +89,11 @@ fn extract_features(packets: &[Packet]) -> [f64; 4] {
     ]
 }
 
-pub fn load(paths: Vec<&Path>) -> Result<Dataset<f64, bool>, Error> {
+pub fn load(paths: Vec<&Path>) -> Result<Dataset<f64, bool>, csv::Error> {
     let mut features = Vec::new();
     let mut labels = Vec::new();
 
-    for path in paths {
+    for path in &paths {
         let mut counter: u16 = 0;
         let mut flag = false;
         let mut packets = Vec::new();
@@ -104,7 +124,7 @@ pub fn load(paths: Vec<&Path>) -> Result<Dataset<f64, bool>, Error> {
             }
 
             if let Some(f) = fields.get(fields.len() - 1) {
-                if f.chars().collect::<Vec<char>>()[0] == 'T' {
+                if f != "Normal" {
                     flag = true
                 }
             }

@@ -58,6 +58,8 @@ pub mod trees {
     use linfa::prelude::*;
     use linfa_trees::{DecisionTree, SplitQuality};
     use std::fs;
+    use std::fs::File;
+    use std::io::Write;
     use std::path::Path;
     use std::time::Instant;
 
@@ -96,6 +98,10 @@ pub mod trees {
         println!("Testing model...");
         let start = Instant::now();
         let pred = model.predict(&test);
+
+        let mut tikz = File::create("decision_tree.tex").unwrap();
+        tikz.write_all(model.export_to_tikz().with_legend().to_string().as_bytes())
+            .unwrap();
 
         (
             pred.confusion_matrix(&test),

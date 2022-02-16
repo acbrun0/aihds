@@ -21,10 +21,50 @@ struct Args {
     /// Type of model to train (supported: SVM, trees)
     #[clap(short, long)]
     model: Option<String>,
+    /// Extracts features to CSV files
+    #[clap(short, long)]
+    extract_features: Option<String>,
 }
 
 fn main() -> Result<(), Error> {
     let args = Args::parse();
+
+    // Write extracted features to a CSV file
+    if args.extract_features.is_some() {
+        let paths = args.extract_features.unwrap();
+        let paths: Vec<&str> = paths.split(',').collect::<Vec<&str>>();
+        let paths: Vec<&Path> = paths.iter().map(Path::new).collect();
+        for path in paths {
+            let dir = &format!(
+                "features/{}",
+                path.parent()
+                    .unwrap()
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+            );
+            match std::fs::create_dir_all(Path::new(dir)) {
+                Ok(_) => (),
+                Err(why) => panic!("Could not create features directory: {}", why),
+            };
+            match dataset::load(vec![path]) {
+                Ok(data) => {
+                    let fp = &format!(
+                        "{}/{}.csv",
+                        dir,
+                        path.file_stem().unwrap().to_str().unwrap()
+                    );
+                    match dataset::write_features(Path::new(fp), &data) {
+                        Ok(_) => (),
+                        Err(why) => println!("Could not write features to {}: {}", fp, why),
+                    }
+                }
+                Err(why) => println!("Could not load data from {}: {}", path.display(), why),
+            }
+        }
+        return Ok(());
+    }
 
     // Check if provided model type is test
     if args.load.is_none() {
@@ -54,11 +94,11 @@ fn main() -> Result<(), Error> {
                                         Ok(cm) => {
                                             println!("{:#?}", cm);
                                             println!(
-                                                        "Accuracy: {:.3}%\nPrecision: {:.3}%\nRecall: {:.3}%\nF-Score: {:.3}%",
+                                                        "Accuracy: {:.3}%\nPrecision: {:.3}%\nRecall: {:.3}%\nF1-Score: {:.3}%",
                                                         cm.accuracy() * 100.0,
                                                         cm.precision() * 100.0,
                                                         cm.recall() * 100.0,
-                                                        cm.f_score(0.5) * 100.0
+                                                        cm.f1_score() * 100.0
                                                     );
                                         }
                                         Err(why) => {
@@ -71,7 +111,7 @@ fn main() -> Result<(), Error> {
                         },
                         "trees" => match trees::train(train_paths) {
                             Ok(model) => {
-                                match model::save(&model, Path::new("models/svm")) {
+                                match model::save(&model, Path::new("models/trees")) {
                                     Ok(_) => (),
                                     Err(why) => println!("Could not save model: {}", why),
                                 }
@@ -86,11 +126,11 @@ fn main() -> Result<(), Error> {
                                         Ok(cm) => {
                                             println!("{:#?}", cm);
                                             println!(
-                                                        "Accuracy: {:.3}%\nPrecision: {:.3}%\nRecall: {:.3}%\nF-Score: {:.3}%",
+                                                        "Accuracy: {:.3}%\nPrecision: {:.3}%\nRecall: {:.3}%\nF1-Score: {:.3}%",
                                                         cm.accuracy() * 100.0,
                                                         cm.precision() * 100.0,
                                                         cm.recall() * 100.0,
-                                                        cm.f_score(0.5) * 100.0
+                                                        cm.f1_score() * 100.0
                                                     );
                                         }
                                         Err(why) => {
@@ -123,11 +163,11 @@ fn main() -> Result<(), Error> {
                             Ok(cm) => {
                                 println!("{:#?}", cm);
                                 println!(
-                                        "Accuracy: {:.3}%\nPrecision: {:.3}%\nRecall: {:.3}%\nF-Score: {:.3}%",
+                                        "Accuracy: {:.3}%\nPrecision: {:.3}%\nRecall: {:.3}%\nF1-Score: {:.3}%",
                                         cm.accuracy() * 100.0,
                                         cm.precision() * 100.0,
                                         cm.recall() * 100.0,
-                                        cm.f_score(0.5) * 100.0
+                                        cm.f1_score() * 100.0
                                     );
                             }
                             Err(why) => {
@@ -150,11 +190,11 @@ fn main() -> Result<(), Error> {
                             Ok(cm) => {
                                 println!("{:#?}", cm);
                                 println!(
-                                        "Accuracy: {:.3}%\nPrecision: {:.3}%\nRecall: {:.3}%\nF-Score: {:.3}%",
+                                        "Accuracy: {:.3}%\nPrecision: {:.3}%\nRecall: {:.3}%\nF1-Score: {:.3}%",
                                         cm.accuracy() * 100.0,
                                         cm.precision() * 100.0,
                                         cm.recall() * 100.0,
-                                        cm.f_score(0.5) * 100.0
+                                        cm.f1_score() * 100.0
                                     );
                             }
                             Err(why) => {
