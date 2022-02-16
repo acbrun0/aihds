@@ -1,6 +1,53 @@
 use std::fs;
 use std::path::Path;
 
+pub mod bayes {
+    use crate::dataset;
+    use linfa::prelude::*;
+    use linfa_bayes::GaussianNb;
+    use std::path::Path;
+    use std::time::Instant;
+
+    pub fn train(
+        paths: Vec<&Path>,
+    ) -> Result<linfa_bayes::GaussianNb<f64, bool>, linfa_bayes::NaiveBayesError> {
+        // Load datasets
+        let train = match dataset::load(paths) {
+            Ok(dataset) => dataset,
+            Err(why) => panic!("Could not read file: {}", why),
+        };
+        println!(
+            "Loaded train dataset with shape: {:?}",
+            train.records.shape()
+        );
+        println!("Training model...");
+        GaussianNb::params().fit(&train)
+    }
+
+    pub fn test(
+        paths: Vec<&Path>,
+        model: GaussianNb<f64, bool>,
+    ) -> (Result<ConfusionMatrix<bool>, linfa::Error>, f64) {
+        let test = match dataset::load(paths) {
+            Ok(dataset) => dataset,
+            Err(why) => panic!("Could not read file: {}", why),
+        };
+        println!(
+            "Loaded validation dataset with shape: {:?}",
+            test.records.shape()
+        );
+        // Test model
+        println!("Testing model...");
+        let start = Instant::now();
+        let pred = model.predict(&test);
+
+        (
+            pred.confusion_matrix(&test),
+            test.records.shape()[0] as f64 / start.elapsed().as_secs_f64(),
+        )
+    }
+}
+
 pub mod svm {
     use crate::dataset;
     use linfa::prelude::*;
