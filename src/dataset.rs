@@ -10,9 +10,11 @@ struct Packet {
     timestamp: f64,
     id: u16,
     data: [u8; 8],
+    flag: bool,
 }
 
-const WINDOW_SIZE: u16 = 1500;
+const WINDOW_SIZE: usize = 1500;
+const WINDOW_SLIDE: usize = 500;
 
 pub fn write_features(path: &Path, dataset: &Dataset<f64, bool>) -> Result<(), csv::Error> {
     let mut wtr = Writer::from_path(path)?;
@@ -94,9 +96,8 @@ pub fn load(paths: Vec<&Path>) -> Result<Dataset<f64, bool>, csv::Error> {
     let mut labels = Vec::new();
 
     for path in &paths {
-        let mut counter: u16 = 0;
-        let mut flag = false;
-        let mut packets = Vec::new();
+        let mut window: Vec<Packet> = Vec::with_capacity(WINDOW_SIZE);
+        let mut buffer: Vec<Packet> = Vec::with_capacity(WINDOW_SLIDE);
         println!("Loading {}", path.display());
         for record in csv::ReaderBuilder::new()
             .has_headers(false)
@@ -123,26 +124,33 @@ pub fn load(paths: Vec<&Path>) -> Result<Dataset<f64, bool>, csv::Error> {
                 *item = u8::from_str_radix(fields.get(i + 3).unwrap(), 16).unwrap();
             }
 
-            if let Some(f) = fields.get(fields.len() - 1) {
-                if f != "Normal" {
-                    flag = true
-                }
-            }
+            let flag = if let Some(f) = fields.get(fields.len() - 1) {
+                f != "Normal"
+            } else {
+                false
+            };
 
-            packets.push(Packet {
+            if buffer.len() == buffer.capacity() {
+                if window.len() == window.capacity() {
+                    window.drain(..WINDOW_SLIDE);
+                }
+                window.append(&mut buffer);
+                features.push(extract_features(&window));
+                let mut flag = false;
+                for p in &window {
+                    if p.flag {
+                        flag = true;
+                        break;
+                    }
+                };
+                labels.push(flag);
+            }
+            buffer.push(Packet {
                 timestamp,
                 id,
                 data,
+                flag,
             });
-            counter += 1;
-
-            if counter == WINDOW_SIZE {
-                features.push(extract_features(&packets));
-                labels.push(flag);
-                packets.clear();
-                counter = 0;
-                flag = false;
-            }
         }
     }
     Ok(
