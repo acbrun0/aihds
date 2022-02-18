@@ -27,6 +27,7 @@ pub mod clustering {
         paths: Vec<&Path>,
         model: KMeans<f64, linfa_nn::distance::L2Dist>,
     ) -> ((u32, u32, u32, u32), f64) {
+        let start = Instant::now();
         let test = match dataset::load(paths) {
             Ok(dataset) => dataset,
             Err(why) => panic!("Could not read file: {}", why),
@@ -37,8 +38,8 @@ pub mod clustering {
         );
         // Test model
         println!("Testing model...");
-        let start = Instant::now();
         let pred = model.predict(&test);
+        let end = start.elapsed().as_secs_f64();
         let mut tp: u32 = 0;
         let mut fp: u32 = 0;
         let mut tn: u32 = 0;
@@ -58,10 +59,7 @@ pub mod clustering {
             }
         }
 
-        (
-            (tp, fp, tn, fal_n),
-            test.records.shape()[0] as f64 / start.elapsed().as_secs_f64(),
-        )
+        ((tp, fp, tn, fal_n), test.records.shape()[0] as f64 / end)
     }
 }
 
