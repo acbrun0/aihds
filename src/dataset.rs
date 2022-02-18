@@ -35,27 +35,31 @@ pub fn write_features(path: &Path, dataset: &Dataset<f64, bool>) -> Result<(), c
 //  - Number of distinct IDs;
 //  - Average time between packets;
 //  - Average time between packets of the same ID;
+//  - General entropy
 //  - Entropy between packets of the same ID;
-fn extract_features(packets: &[Packet]) -> [f64; 4] {
+//  - Average Hamming distance between packets of the same ID
+fn extract_features(packets: &[Packet]) -> [f64; 5] {
     let mut feat = HashMap::new();
     let mut ts = Vec::new();
     let mut avg_time = Vec::new();
     let mut entropy = Vec::new();
+    // let mut hamming = Vec::new();
+    let mut general_entropy = 0.0;
 
-    // Separate packets by ID
     for p in packets {
         ts.push(p.timestamp);
+        let prob =
+            packets.iter().filter(|&x| x.data == p.data).count() as f64 / packets.len() as f64;
+        general_entropy += 0.0 - prob * prob.log2();
         let stat = feat.entry(p.id).or_insert((Vec::new(), Vec::new()));
         stat.0.push(p.timestamp);
         stat.1.push(p.data);
     }
 
-    // Get difference between timestamps
     ts = ts.windows(2).map(|w| w[1] - w[0]).collect::<Vec<f64>>();
     ts[0] = 0.0;
 
     for (_, val) in feat.iter_mut() {
-        // Get difference between timestamps of packets with the same ID
         if val.0.len() > 1 {
             val.0 = val.0.windows(2).map(|w| w[1] - w[0]).collect::<Vec<f64>>();
             val.0.swap_remove(0);
@@ -69,25 +73,39 @@ fn extract_features(packets: &[Packet]) -> [f64; 4] {
             0.0
         });
 
-        // Get average entropy of packets with the same ID
         let n_packets = val.1.len();
         let mut datamap = HashMap::new();
         let mut probs = Vec::new();
+        // let mut ham = Vec::new();
         for bytes in &val.1 {
             let entry = datamap.entry(bytes).or_insert(0);
             *entry += 1;
+            // for x in &val.1 {
+            //     ham.push(match hamming::distance_fast(bytes, x) {
+            //         Ok(d) => d,
+            //         Err(why) => panic!(
+            //             "Could not calculate Hamming distance between {:?} and {:?}: {}",
+            //             bytes,
+            //             x,
+            //             why
+            //         ),
+            //     });
+            // }
         }
         for count in datamap.values() {
             probs.push(*count as f64 / n_packets as f64);
         }
         entropy.push(0.0 - probs.iter().map(|p| p * p.log2()).sum::<f64>());
+        // hamming.push(ham.iter().sum::<u64>() as f64 / n_packets as f64);
     }
 
     [
         feat.len() as f64,
-        ts.iter().sum::<f64>() as f64 / ts.len() as f64,
-        avg_time.iter().sum::<f64>() as f64 / avg_time.len() as f64,
-        entropy.iter().sum::<f64>() as f64 / entropy.len() as f64,
+        ts.iter().sum::<f64>() / ts.len() as f64,
+        avg_time.iter().sum::<f64>() / avg_time.len() as f64,
+        general_entropy,
+        entropy.iter().sum::<f64>() / entropy.len() as f64,
+        // hamming.iter().sum::<f64>() / hamming.len() as f64,
     ]
 }
 
@@ -142,7 +160,7 @@ pub fn load(paths: Vec<&Path>) -> Result<Dataset<f64, bool>, csv::Error> {
                         flag = true;
                         break;
                     }
-                };
+                }
                 labels.push(flag);
             }
             buffer.push(Packet {
