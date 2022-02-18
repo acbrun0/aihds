@@ -3,16 +3,16 @@ mod model;
 
 use clap::Parser;
 use linfa::prelude::*;
-use model::{bayes, svm, trees};
+use model::{bayes, clustering, svm, trees};
 use std::path::Path;
 
 #[derive(Parser)]
 #[clap(author, version, about)]
 struct Args {
-    /// Paths to the datasets required for training the model, separated by ','
+    /// Paths to the datasets required for training the model, separated by ',' (use "all" to train with all datasets)
     #[clap(short, long)]
     train: Option<String>,
-    /// Paths to the datasets required for testing the model, separated by ','
+    /// Paths to the datasets required for testing the model, separated by ',' (use "all" to test with all datasets)
     #[clap(short, long)]
     test: Option<String>,
     /// Path to model to be loaded
@@ -25,6 +25,30 @@ struct Args {
     #[clap(short, long)]
     extract_features: Option<String>,
 }
+
+const ALL_TRAIN_PATHS: [&str; 11] = [
+    ".\\datasets\\ieee_challenge\\0_Preliminary\\0_Training\\Pre_train_D_0.csv",
+    ".\\datasets\\ieee_challenge\\0_Preliminary\\0_Training\\Pre_train_D_1.csv",
+    ".\\datasets\\ieee_challenge\\0_Preliminary\\0_Training\\Pre_train_D_2.csv",
+    ".\\datasets\\ieee_challenge\\0_Preliminary\\0_Training\\Pre_train_S_0.csv",
+    ".\\datasets\\ieee_challenge\\0_Preliminary\\0_Training\\Pre_train_S_1.csv",
+    ".\\datasets\\ieee_challenge\\0_Preliminary\\0_Training\\Pre_train_S_2.csv",
+    ".\\datasets\\car_hacking\\DoS\\train.csv",
+    ".\\datasets\\car_hacking\\fuzzy\\train.csv",
+    ".\\datasets\\car_hacking\\gear\\train.csv",
+    ".\\datasets\\car_hacking\\rpm\\train.csv",
+    ".\\datasets\\car_hacking\\normal\\dataset.csv ",
+];
+
+const ALL_TEST_PATHS: [&str; 7] = [
+    ".\\datasets\\ieee_challenge\\0_Preliminary\\1_Submission\\Pre_submit_D.csv",
+    ".\\datasets\\ieee_challenge\\0_Preliminary\\1_Submission\\Pre_submit_S.csv",
+    ".\\datasets\\ieee_challenge\\1_Final\\Fin_host_session_submit_S.csv",
+    ".\\datasets\\car_hacking\\DoS\\test.csv",
+    ".\\datasets\\car_hacking\\rpm\\test.csv",
+    ".\\datasets\\car_hacking\\gear\\test.csv",
+    ".\\datasets\\car_hacking\\fuzzy\\test.csv",
+];
 
 fn main() -> Result<(), Error> {
     let args = Args::parse();
@@ -73,7 +97,11 @@ fn main() -> Result<(), Error> {
         } else {
             match args.train {
                 Some(paths) => {
-                    let train_paths: Vec<&str> = paths.split(',').collect::<Vec<&str>>();
+                    let train_paths: Vec<&str> = if paths == "all" {
+                        Vec::from(ALL_TRAIN_PATHS)
+                    } else {
+                        paths.split(',').collect::<Vec<&str>>()
+                    };
                     let train_paths: Vec<&Path> = train_paths.iter().map(Path::new).collect();
                     let modeltype = args.model.unwrap();
                     match modeltype.to_lowercase().as_str() {
@@ -84,8 +112,11 @@ fn main() -> Result<(), Error> {
                                     Err(why) => println!("Could not save model: {}", why),
                                 }
                                 if let Some(paths) = args.test {
-                                    let test_paths: Vec<&str> =
-                                        paths.split(',').collect::<Vec<&str>>();
+                                    let test_paths: Vec<&str> = if paths == "all" {
+                                        Vec::from(ALL_TEST_PATHS)
+                                    } else {
+                                        paths.split(',').collect::<Vec<&str>>()
+                                    };
                                     let test_paths: Vec<&Path> =
                                         test_paths.iter().map(Path::new).collect();
                                     let (confusion_matrix, speed) = svm::test(test_paths, model);
@@ -116,8 +147,11 @@ fn main() -> Result<(), Error> {
                                     Err(why) => println!("Could not save model: {}", why),
                                 }
                                 if let Some(paths) = args.test {
-                                    let test_paths: Vec<&str> =
-                                        paths.split(',').collect::<Vec<&str>>();
+                                    let test_paths: Vec<&str> = if paths == "all" {
+                                        Vec::from(ALL_TEST_PATHS)
+                                    } else {
+                                        paths.split(',').collect::<Vec<&str>>()
+                                    };
                                     let test_paths: Vec<&Path> =
                                         test_paths.iter().map(Path::new).collect();
                                     let (confusion_matrix, speed) = trees::test(test_paths, model);
@@ -144,8 +178,11 @@ fn main() -> Result<(), Error> {
                         "bayes" => match bayes::train(train_paths) {
                             Ok(model) => {
                                 if let Some(paths) = args.test {
-                                    let test_paths: Vec<&str> =
-                                        paths.split(',').collect::<Vec<&str>>();
+                                    let test_paths: Vec<&str> = if paths == "all" {
+                                        Vec::from(ALL_TEST_PATHS)
+                                    } else {
+                                        paths.split(',').collect::<Vec<&str>>()
+                                    };
                                     let test_paths: Vec<&Path> =
                                         test_paths.iter().map(Path::new).collect();
                                     let (confusion_matrix, speed) = bayes::test(test_paths, model);
@@ -169,6 +206,24 @@ fn main() -> Result<(), Error> {
                             }
                             Err(why) => panic!("Could not train model: {}", why),
                         },
+                        "clustering" => match clustering::train(train_paths) {
+                            Ok(model) => {
+                                if let Some(paths) = args.test {
+                                    let test_paths: Vec<&str> = if paths == "all" {
+                                        Vec::from(ALL_TEST_PATHS)
+                                    } else {
+                                        paths.split(',').collect::<Vec<&str>>()
+                                    };
+                                    let test_paths: Vec<&Path> =
+                                        test_paths.iter().map(Path::new).collect();
+                                    let ((tp, fp, tn, fal_n), speed) =
+                                        clustering::test(test_paths, model);
+                                    println!("Classification speed: {:.2} packets/s", speed);
+                                    println! {"True positives: {}\nTrue negatives: {}\nFalse positives: {}\nFalse negatives: {}", tp, fp, tn, fal_n}
+                                }
+                            }
+                            Err(why) => panic!("Could not train model: {}", why),
+                        },
                         _ => panic!("Unsupported model type: {}", modeltype),
                     }
                 }
@@ -183,7 +238,11 @@ fn main() -> Result<(), Error> {
             match svm::load(Path::new(&modelpath)) {
                 Ok(model) => {
                     if let Some(paths) = args.test {
-                        let test_paths: Vec<&str> = paths.split(',').collect::<Vec<&str>>();
+                        let test_paths: Vec<&str> = if paths == "all" {
+                            Vec::from(ALL_TEST_PATHS)
+                        } else {
+                            paths.split(',').collect::<Vec<&str>>()
+                        };
                         let test_paths: Vec<&Path> = test_paths.iter().map(Path::new).collect();
                         let (confusion_matrix, speed) = svm::test(test_paths, model);
                         println!("Classification speed: {:.2} packets/s", speed);
@@ -210,7 +269,11 @@ fn main() -> Result<(), Error> {
             match trees::load(Path::new(&modelpath)) {
                 Ok(model) => {
                     if let Some(paths) = args.test {
-                        let test_paths: Vec<&str> = paths.split(',').collect::<Vec<&str>>();
+                        let test_paths: Vec<&str> = if paths == "all" {
+                            Vec::from(ALL_TEST_PATHS)
+                        } else {
+                            paths.split(',').collect::<Vec<&str>>()
+                        };
                         let test_paths: Vec<&Path> = test_paths.iter().map(Path::new).collect();
                         let (confusion_matrix, speed) = trees::test(test_paths, model);
                         println!("Classification speed: {:.2} packets/s", speed);

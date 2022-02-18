@@ -1,6 +1,70 @@
 use std::fs;
 use std::path::Path;
 
+pub mod clustering {
+    use crate::dataset;
+    use linfa::traits::{Fit, Predict};
+    use linfa_clustering::KMeans;
+    use std::path::Path;
+    use std::time::Instant;
+
+    pub fn train(
+        paths: Vec<&Path>,
+    ) -> Result<KMeans<f64, linfa_nn::distance::L2Dist>, linfa_clustering::KMeansError> {
+        let train = match dataset::load(paths) {
+            Ok(dataset) => dataset,
+            Err(why) => panic!("Could not read file: {}", why),
+        };
+        println!(
+            "Loaded train dataset with shape: {:?}",
+            train.records.shape()
+        );
+        println!("Training model...");
+        KMeans::params(2).fit(&train)
+    }
+
+    pub fn test(
+        paths: Vec<&Path>,
+        model: KMeans<f64, linfa_nn::distance::L2Dist>,
+    ) -> ((u32, u32, u32, u32), f64) {
+        let test = match dataset::load(paths) {
+            Ok(dataset) => dataset,
+            Err(why) => panic!("Could not read file: {}", why),
+        };
+        println!(
+            "Loaded validation dataset with shape: {:?}",
+            test.records.shape()
+        );
+        // Test model
+        println!("Testing model...");
+        let start = Instant::now();
+        let pred = model.predict(&test);
+        let mut tp: u32 = 0;
+        let mut fp: u32 = 0;
+        let mut tn: u32 = 0;
+        let mut fal_n: u32 = 0;
+
+        for (p, r) in pred.iter().zip(test.targets.into_raw_vec()) {
+            if r {
+                if *p == 1 {
+                    tp += 1;
+                } else {
+                    fal_n += 1;
+                }
+            } else if *p == 0 {
+                tn += 1;
+            } else {
+                fp += 1;
+            }
+        }
+
+        (
+            (tp, fp, tn, fal_n),
+            test.records.shape()[0] as f64 / start.elapsed().as_secs_f64(),
+        )
+    }
+}
+
 pub mod bayes {
     use crate::dataset;
     use linfa::prelude::*;
