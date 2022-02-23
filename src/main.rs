@@ -3,7 +3,7 @@ mod model;
 
 use clap::Parser;
 use linfa::prelude::*;
-use model::{bayes, clustering, svm, trees};
+use model::{clustering, svm};
 use std::path::Path;
 
 #[derive(Parser)]
@@ -21,9 +21,15 @@ struct Args {
     /// Type of model to train (supported: SVM, trees)
     #[clap(short, long)]
     model: Option<String>,
+    /// Perform grid search on model
+    #[clap(short, long)]
+    grid_search: bool,
     /// Extracts features to CSV files
     #[clap(short, long)]
     extract_features: Option<String>,
+    /// Use libsvm format
+    #[clap(short, long)]
+    libsvm: bool,
 }
 
 const ALL_TRAIN_PATHS: [&str; 11] = [
@@ -53,38 +59,55 @@ const ALL_TEST_PATHS: [&str; 7] = [
 fn main() -> Result<(), Error> {
     let args = Args::parse();
 
-    // Write extracted features to a CSV file
+    // Write extracted features to file
     if args.extract_features.is_some() {
         let paths = args.extract_features.unwrap();
-        let paths: Vec<&str> = paths.split(',').collect::<Vec<&str>>();
+        let paths: Vec<&str> = if paths == "all" {
+            Vec::from(ALL_TRAIN_PATHS)
+        } else {
+            paths.split(',').collect::<Vec<&str>>()
+        };
         let paths: Vec<&Path> = paths.iter().map(Path::new).collect();
-        for path in paths {
-            let dir = &format!(
-                "features/{}",
-                path.parent()
-                    .unwrap()
-                    .file_name()
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-            );
-            match std::fs::create_dir_all(Path::new(dir)) {
-                Ok(_) => (),
-                Err(why) => panic!("Could not create features directory: {}", why),
-            };
-            match dataset::load(vec![path]) {
-                Ok(data) => {
-                    let fp = &format!(
-                        "{}/{}.csv",
-                        dir,
-                        path.file_stem().unwrap().to_str().unwrap()
-                    );
-                    match dataset::write_features(Path::new(fp), &data) {
+        if args.libsvm {
+            match dataset::load(paths, None, true) {
+                Ok(mut data) => {
+                    match dataset::write_features(Path::new("libsvm/targets.txt"), &mut data, true)
+                    {
                         Ok(_) => (),
-                        Err(why) => println!("Could not write features to {}: {}", fp, why),
+                        Err(why) => println!("Could not write features: {}", why),
                     }
                 }
-                Err(why) => println!("Could not load data from {}: {}", path.display(), why),
+                Err(why) => println!("Could not load datasets: {}", why),
+            }
+        } else {
+            for path in paths {
+                let dir = &format!(
+                    "features/{}",
+                    path.parent()
+                        .unwrap()
+                        .file_name()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                );
+                match std::fs::create_dir_all(Path::new(dir)) {
+                    Ok(_) => (),
+                    Err(why) => panic!("Could not create features directory: {}", why),
+                };
+                match dataset::load(vec![path], None, true) {
+                    Ok(mut data) => {
+                        let fp = &format!(
+                            "{}/{}.csv",
+                            dir,
+                            path.file_stem().unwrap().to_str().unwrap()
+                        );
+                        match dataset::write_features(Path::new(fp), &mut data, false) {
+                            Ok(_) => (),
+                            Err(why) => println!("Could not write features to {}: {}", fp, why),
+                        }
+                    }
+                    Err(why) => println!("Could not load data from {}: {}", path.display(), why),
+                }
             }
         }
         return Ok(());
@@ -100,112 +123,83 @@ fn main() -> Result<(), Error> {
                     let train_paths: Vec<&str> = if paths == "all" {
                         Vec::from(ALL_TRAIN_PATHS)
                     } else {
-                        paths.split(',').collect::<Vec<&str>>()
+                        paths.split(',').collect()
                     };
                     let train_paths: Vec<&Path> = train_paths.iter().map(Path::new).collect();
                     let modeltype = args.model.unwrap();
                     match modeltype.to_lowercase().as_str() {
-                        "svm" => match svm::train(train_paths) {
-                            Ok(model) => {
-                                match model::save(&model, Path::new("models/svm")) {
-                                    Ok(_) => (),
-                                    Err(why) => println!("Could not save model: {}", why),
+                        "svm" => {
+                            if args.grid_search {
+                                let train = match dataset::load(train_paths, None, true) {
+                                    Ok(dataset) => dataset,
+                                    Err(why) => panic!("Could not read file: {}", why),
+                                };
+                                let test_paths: Vec<&str> = if args.test.unwrap() == "all" {
+                                    Vec::from(ALL_TEST_PATHS)
+                                } else {
+                                    paths.split(',').collect()
+                                };
+                                let test_paths: Vec<&Path> =
+                                    test_paths.iter().map(Path::new).collect();
+                                let test = match dataset::load(test_paths, None, true) {
+                                    Ok(dataset) => dataset,
+                                    Err(why) => panic!("Could not read file: {}", why),
+                                };
+                                match svm::grid_search(&train, &test) {
+                                    Ok(results) => println!("{:#?}", results),
+                                    Err(why) => panic!("Could not perform grid search: {}", why),
                                 }
-                                if let Some(paths) = args.test {
-                                    let test_paths: Vec<&str> = if paths == "all" {
-                                        Vec::from(ALL_TEST_PATHS)
-                                    } else {
-                                        paths.split(',').collect::<Vec<&str>>()
-                                    };
-                                    let test_paths: Vec<&Path> =
-                                        test_paths.iter().map(Path::new).collect();
-                                    let (confusion_matrix, speed) = svm::test(test_paths, model);
-                                    println!("Classification speed: {:.2} packets/s", speed);
-                                    match confusion_matrix {
-                                        Ok(cm) => {
-                                            println!("{:#?}", cm);
-                                            println!(
-                                                        "Accuracy: {:.3}%\nPrecision: {:.3}%\nRecall: {:.3}%\nF1-Score: {:.3}%",
-                                                        cm.accuracy() * 100.0,
-                                                        cm.precision() * 100.0,
-                                                        cm.recall() * 100.0,
-                                                        cm.f1_score() * 100.0
-                                                    );
+                            } else {
+                                let (model, scaler) = svm::train(train_paths);
+                                match model {
+                                    Ok(model) => {
+                                        match model::save(&model, Path::new("models/svm")) {
+                                            Ok(_) => (),
+                                            Err(why) => println!("Could not save model: {}", why),
                                         }
-                                        Err(why) => {
-                                            println!("Could not compute confusion matrix: {}", why)
+                                        if let Some(paths) = args.test {
+                                            let test_paths: Vec<&str> = if paths == "all" {
+                                                Vec::from(ALL_TEST_PATHS)
+                                            } else {
+                                                paths.split(',').collect()
+                                            };
+                                            let test_paths: Vec<&Path> =
+                                                test_paths.iter().map(Path::new).collect();
+                                            // let scaler = bincode::deserialize(
+                                            //     &std::fs::read("datasets/scaler")
+                                            //         .expect("Could not deserialize scaler."),
+                                            // )
+                                            // .expect("Could not read scaler from file.");
+                                            let (confusion_matrix, speed) =
+                                                svm::test(test_paths, model, scaler);
+                                            println!(
+                                                "Classification speed: {:.2} packets/s",
+                                                speed
+                                            );
+                                            match confusion_matrix {
+                                                Ok(cm) => {
+                                                    println!("{:#?}", cm);
+                                                    println!(
+                                                            "Accuracy: {:.3}%\nPrecision: {:.3}%\nRecall: {:.3}%\nF1-Score: {:.3}%",
+                                                            cm.accuracy() * 100.0,
+                                                            cm.precision() * 100.0,
+                                                            cm.recall() * 100.0,
+                                                            cm.f1_score() * 100.0
+                                                        );
+                                                }
+                                                Err(why) => {
+                                                    println!(
+                                                        "Could not compute confusion matrix: {}",
+                                                        why
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
+                                    Err(why) => panic!("Could not train model: {}", why),
                                 }
                             }
-                            Err(why) => panic!("Could not train model: {}", why),
-                        },
-                        "trees" => match trees::train(train_paths) {
-                            Ok(model) => {
-                                match model::save(&model, Path::new("models/trees")) {
-                                    Ok(_) => (),
-                                    Err(why) => println!("Could not save model: {}", why),
-                                }
-                                if let Some(paths) = args.test {
-                                    let test_paths: Vec<&str> = if paths == "all" {
-                                        Vec::from(ALL_TEST_PATHS)
-                                    } else {
-                                        paths.split(',').collect::<Vec<&str>>()
-                                    };
-                                    let test_paths: Vec<&Path> =
-                                        test_paths.iter().map(Path::new).collect();
-                                    let (confusion_matrix, speed) = trees::test(test_paths, model);
-                                    println!("Classification speed: {:.2} packets/s", speed);
-                                    match confusion_matrix {
-                                        Ok(cm) => {
-                                            println!("{:#?}", cm);
-                                            println!(
-                                                        "Accuracy: {:.3}%\nPrecision: {:.3}%\nRecall: {:.3}%\nF1-Score: {:.3}%",
-                                                        cm.accuracy() * 100.0,
-                                                        cm.precision() * 100.0,
-                                                        cm.recall() * 100.0,
-                                                        cm.f1_score() * 100.0
-                                                    );
-                                        }
-                                        Err(why) => {
-                                            println!("Could not compute confusion matrix: {}", why)
-                                        }
-                                    }
-                                }
-                            }
-                            Err(why) => panic!("Could not train model: {}", why),
-                        },
-                        "bayes" => match bayes::train(train_paths) {
-                            Ok(model) => {
-                                if let Some(paths) = args.test {
-                                    let test_paths: Vec<&str> = if paths == "all" {
-                                        Vec::from(ALL_TEST_PATHS)
-                                    } else {
-                                        paths.split(',').collect::<Vec<&str>>()
-                                    };
-                                    let test_paths: Vec<&Path> =
-                                        test_paths.iter().map(Path::new).collect();
-                                    let (confusion_matrix, speed) = bayes::test(test_paths, model);
-                                    println!("Classification speed: {:.2} packets/s", speed);
-                                    match confusion_matrix {
-                                        Ok(cm) => {
-                                            println!("{:#?}", cm);
-                                            println!(
-                                                        "Accuracy: {:.3}%\nPrecision: {:.3}%\nRecall: {:.3}%\nF1-Score: {:.3}%",
-                                                        cm.accuracy() * 100.0,
-                                                        cm.precision() * 100.0,
-                                                        cm.recall() * 100.0,
-                                                        cm.f1_score() * 100.0
-                                                    );
-                                        }
-                                        Err(why) => {
-                                            println!("Could not compute confusion matrix: {}", why)
-                                        }
-                                    }
-                                }
-                            }
-                            Err(why) => panic!("Could not train model: {}", why),
-                        },
+                        }
                         "clustering" => match clustering::train(train_paths) {
                             Ok(model) => {
                                 if let Some(paths) = args.test {
@@ -216,8 +210,13 @@ fn main() -> Result<(), Error> {
                                     };
                                     let test_paths: Vec<&Path> =
                                         test_paths.iter().map(Path::new).collect();
+                                    let scaler = bincode::deserialize(
+                                        &std::fs::read("datasets/scaler")
+                                            .expect("Could not deserialize scaler."),
+                                    )
+                                    .expect("Could not read scaler from file.");
                                     let ((tp, fp, tn, fal_n), speed) =
-                                        clustering::test(test_paths, model);
+                                        clustering::test(test_paths, model, scaler);
                                     println!("Classification speed: {:.2} packets/s", speed);
                                     println! {"True positives: {}\nTrue negatives: {}\nFalse positives: {}\nFalse negatives: {}", tp, fp, tn, fal_n}
                                 }
@@ -244,58 +243,32 @@ fn main() -> Result<(), Error> {
                             paths.split(',').collect::<Vec<&str>>()
                         };
                         let test_paths: Vec<&Path> = test_paths.iter().map(Path::new).collect();
-                        let (confusion_matrix, speed) = svm::test(test_paths, model);
-                        println!("Classification speed: {:.2} packets/s", speed);
-                        match confusion_matrix {
-                            Ok(cm) => {
-                                println!("{:#?}", cm);
-                                println!(
-                                        "Accuracy: {:.3}%\nPrecision: {:.3}%\nRecall: {:.3}%\nF1-Score: {:.3}%",
-                                        cm.accuracy() * 100.0,
-                                        cm.precision() * 100.0,
-                                        cm.recall() * 100.0,
-                                        cm.f1_score() * 100.0
-                                    );
-                            }
-                            Err(why) => {
-                                println!("Could not compute confusion matrix: {}", why)
-                            }
-                        }
+                        // let scaler = bincode::deserialize(
+                        //     &std::fs::read("datasets/scaler")
+                        //         .expect("Could not deserialize scaler."),
+                        // )
+                        // .expect("Could not read scaler from file.");
+                        // let (confusion_matrix, speed) = svm::test(test_paths, model, scaler);
+                        // println!("Classification speed: {:.2} packets/s", speed);
+                        // match confusion_matrix {
+                        //     Ok(cm) => {
+                        //         println!("{:#?}", cm);
+                        //         println!(
+                        //                 "Accuracy: {:.3}%\nPrecision: {:.3}%\nRecall: {:.3}%\nF1-Score: {:.3}%",
+                        //                 cm.accuracy() * 100.0,
+                        //                 cm.precision() * 100.0,
+                        //                 cm.recall() * 100.0,
+                        //                 cm.f1_score() * 100.0
+                        //             );
+                        //     }
+                        //     Err(why) => {
+                        //         println!("Could not compute confusion matrix: {}", why)
+                        //     }
+                        // }
                     }
                 }
                 Err(why) => panic!("Could not load model: {}", why),
-            };
-        } else if modelpath.contains("trees") {
-            match trees::load(Path::new(&modelpath)) {
-                Ok(model) => {
-                    if let Some(paths) = args.test {
-                        let test_paths: Vec<&str> = if paths == "all" {
-                            Vec::from(ALL_TEST_PATHS)
-                        } else {
-                            paths.split(',').collect::<Vec<&str>>()
-                        };
-                        let test_paths: Vec<&Path> = test_paths.iter().map(Path::new).collect();
-                        let (confusion_matrix, speed) = trees::test(test_paths, model);
-                        println!("Classification speed: {:.2} packets/s", speed);
-                        match confusion_matrix {
-                            Ok(cm) => {
-                                println!("{:#?}", cm);
-                                println!(
-                                        "Accuracy: {:.3}%\nPrecision: {:.3}%\nRecall: {:.3}%\nF1-Score: {:.3}%",
-                                        cm.accuracy() * 100.0,
-                                        cm.precision() * 100.0,
-                                        cm.recall() * 100.0,
-                                        cm.f1_score() * 100.0
-                                    );
-                            }
-                            Err(why) => {
-                                println!("Could not compute confusion matrix: {}", why)
-                            }
-                        }
-                    }
-                }
-                Err(why) => panic!("Could not load model: {}", why),
-            };
+            }
         } else {
             panic!("Could not load model from {}", modelpath)
         }

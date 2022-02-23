@@ -8,11 +8,10 @@ csv = "1.1"
 clap = { version = "3.0", features = ["derive"]}
 linfa = "0.5"
 linfa-svm = {version = "0.5", features = ["serde"]}
-linfa-trees = {version = "0.5", features = ["serde"]}
-linfa-bayes = "0.5"
 linfa-nn = "0.5"
 linfa-clustering = {version = "0.5", features = ["serde"]}
-hamming = "0.1"
+linfa-preprocessing = "0.5"
 ndarray = "0.15"
+ndarray-stats = "0.5"
 bincode = "1.3"
 serde = "1.0"
