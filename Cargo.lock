@@ -12,6 +12,7 @@ dependencies = [
  "linfa",
  "linfa-svm",
  "ndarray",
+ "ndarray-stats",
  "serde",
 ]
 
