@@ -11,22 +11,22 @@ use std::path::Path;
 #[clap(author, version, about)]
 struct Args {
     /// Paths to the datasets required for training the model, separated by ','
-    #[clap(short, long)]
+    #[clap(long)]
     train: Option<String>,
     /// Paths to the datasets required for testing the model, separated by ','
-    #[clap(short, long)]
+    #[clap(long)]
     test: Option<String>,
     /// Path to model to be loaded
-    #[clap(short, long)]
+    #[clap(long)]
     load: Option<String>,
     /// Extracts features to CSV files
-    #[clap(short, long)]
+    #[clap(long)]
     extract_features: Option<String>,
     /// Perform grid search optimization on SVM
-    #[clap(short, long)]
+    #[clap(long)]
     grid_search: bool,
     /// Use libsvm format
-    #[clap(short, long)]
+    #[clap(long)]
     libsvm: bool,
 }
 
@@ -71,7 +71,7 @@ fn main() -> Result<(), Error> {
                 }
                 Err(_) => None
             };
-            match dataset::load_unsupervised(paths, scaler) {
+            match dataset::load(paths, scaler) {
                 Ok((mut dataset, _)) => match dataset::write_features(
                     Path::new("libsvm/features.txt"),
                     &mut dataset,
@@ -97,7 +97,7 @@ fn main() -> Result<(), Error> {
                     Ok(_) => (),
                     Err(why) => panic!("Could not create features directory: {}", why),
                 };
-                match dataset::load_unsupervised(vec![path], None) {
+                match dataset::load(vec![path], None) {
                     Ok((mut dataset, _)) => {
                         let fp = &format!(
                             "{}/{}.csv",

@@ -16,12 +16,13 @@ struct Packet {
     flag: bool,
 }
 
-const WINDOW_SIZE: usize = 1000;
-const WINDOW_SLIDE: usize = 100;
+const WINDOW_SIZE: usize = 3000;
+const WINDOW_SLIDE: usize = 1000;
+const ATTACK_THRESHOLD: f64 = 0.1;
 
 pub fn write_features(
     path: &Path,
-    dataset: &mut Dataset<f64, ()>,
+    dataset: &mut Dataset<f64, bool>,
     is_libsvm: bool,
 ) -> Result<(), csv::Error> {
     if is_libsvm {
@@ -43,16 +44,20 @@ pub fn write_features(
         }
     } else {
         let mut wtr = Writer::from_path(path)?;
-        for (_i, record) in dataset.records.outer_iter().enumerate() {
-            wtr.write_record(&[
-                record[0].to_string(),
-                record[1].to_string(),
-                record[2].to_string(),
-                // record[3].to_string(),
-                // dataset.targets.slice(s![_i, 0]).to_string(),
-            ])?;
+        match wtr.write_record(dataset.feature_names()) {
+            Ok(()) => {
+                for (i, record) in dataset.records.outer_iter().enumerate() {
+                    wtr.write_record(&[
+                        record[0].to_string(),
+                        record[1].to_string(),
+                        record[2].to_string(),
+                        dataset.targets.slice(s![i, 0]).to_string(),
+                    ])?;
+                }
+                wtr.flush()?;
+            },
+            Err(why) => panic!("Could not write to {}: {}", path.display(), why)
         }
-        wtr.flush()?;
     }
     Ok(())
 }
@@ -69,6 +74,7 @@ fn extract_features(packets: &[Packet]) -> [f64; 3] {
     let mut ts = Vec::new();
     let mut avg_time = Vec::new();
     let mut entropy = Vec::new();
+    let mut hamming: Vec<f64> = Vec::new();
     let mut general_entropy = 0.0;
 
     for p in packets {
@@ -101,7 +107,6 @@ fn extract_features(packets: &[Packet]) -> [f64; 3] {
         let n_packets = val.1.len();
         let mut datamap = HashMap::new();
         let mut probs = Vec::new();
-        // let mut ham = Vec::new();
         for bytes in &val.1 {
             let entry = datamap.entry(bytes).or_insert(0);
             *entry += 1;
@@ -110,14 +115,24 @@ fn extract_features(packets: &[Packet]) -> [f64; 3] {
             probs.push(*count as f64 / n_packets as f64);
         }
         entropy.push(0.0 - probs.iter().map(|p| p * p.log2()).sum::<f64>());
+        if val.1.len() > 1 {
+            hamming.push(val.1.windows(2).map(|b| {
+                let mut count = 0;
+                for (b1, b2) in b[0].iter().zip(b[1]) {
+                    if *b1 != b2 { count += 1 }
+                }
+                count
+            }).collect::<Vec<u32>>().iter().sum::<u32>() as f64 / (val.1.len() - 1) as f64);
+        }
     }
 
     [
         // feat.len() as f64,
         // ts.iter().sum::<f64>() / ts.len() as f64,
+        // general_entropy,
         avg_time.iter().sum::<f64>() / avg_time.len() as f64,
-        general_entropy,
         entropy.iter().sum::<f64>() / entropy.len() as f64,
+        hamming.iter().sum::<f64>() / hamming.len() as f64
     ]
 }
 
@@ -273,17 +288,17 @@ pub fn load(
             if buffer.len() == buffer.capacity() {
                 if window.len() == window.capacity() {
                     features.push(extract_features(&window));
+                    // let mut flag = false;
+                    // for p in &window {
+                    //     if p.flag {
+                    //         flag = true;
+                    //         break;
+                    //     }
+                    // }
+                    labels.push(window.iter().filter(|&p| p.flag).count() as f64 > WINDOW_SIZE as f64 * ATTACK_THRESHOLD);
                     window.drain(..WINDOW_SLIDE);
                 }
                 window.append(&mut buffer);
-                let mut flag = false;
-                for p in &window {
-                    if p.flag {
-                        flag = true;
-                        break;
-                    }
-                }
-                labels.push(flag);
             }
             if window.len() < window.capacity() {
                 window.push(Packet {
@@ -304,10 +319,10 @@ pub fn load(
     }
     let mut dataset = Dataset::new(Array2::from(features), Array1::from(labels))
         .with_feature_names(vec![
-            "Distinct IDs",
-            "Average time between consecutive packets",
-            "Average time between packets of the same ID",
-            "Average entropy between packets of the same ID",
+            "AvgTime",
+            "Entropy",
+            "HammingDist",
+            "Label"
         ]);
     if let Some(new_scaler) = normalize(&mut dataset, &scaler) {
         Ok((dataset, new_scaler))
@@ -386,10 +401,10 @@ pub fn load_unsupervised(
     }
     let mut dataset = Dataset::new(Array2::from(features), Array1::from(labels))
         .with_feature_names(vec![
-            "Distinct IDs",
-            "Average time between consecutive packets",
-            "Average time between packets of the same ID",
-            "Average entropy between packets of the same ID",
+            "AvgTime",
+            "Entropy",
+            "HammingDist",
+            "Label"
         ]);
     if let Some(new_scaler) = normalize_unsupervised(&mut dataset, &scaler) {
         match fs::write("models/scaler", bincode::serialize(&new_scaler).unwrap()) {

@@ -9,7 +9,7 @@ pub mod svm {
     use std::time::Instant;
 
     pub fn train(dataset: &Dataset<f64, ()>) -> Result<Svm<f64, bool>, linfa_svm::SvmError> {
-        Svm::<f64, _>::params().gaussian_kernel(0.01).nu_weight(0.9).fit(dataset)
+        Svm::<f64, _>::params().pos_neg_weights(1.0, 10.0).gaussian_kernel(0.01).nu_weight(0.9).fit(dataset)
     }
 
     pub fn test(
@@ -193,7 +193,7 @@ pub mod svm {
                 }
             }
         }
-        results.sort_by(|x, y| y.4.partial_cmp(&x.4).unwrap());
+        results.sort_by(|x, y| y.7.partial_cmp(&x.7).unwrap());
         Ok(results)
     }
 }
