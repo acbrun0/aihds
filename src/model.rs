@@ -9,7 +9,11 @@ pub mod svm {
     use std::time::Instant;
 
     pub fn train(dataset: &Dataset<f64, ()>) -> Result<Svm<f64, bool>, linfa_svm::SvmError> {
-        Svm::<f64, _>::params().pos_neg_weights(1.0, 10.0).gaussian_kernel(0.01).nu_weight(0.9).fit(dataset)
+        Svm::<f64, _>::params()
+            // .gaussian_kernel(1.0)
+            .polynomial_kernel(0.0, 7.0)
+            .nu_weight(0.001)
+            .fit(dataset)
     }
 
     pub fn test(
@@ -20,6 +24,7 @@ pub mod svm {
         let pred = model.predict(dataset);
         (
             pred.confusion_matrix(dataset),
+            // pred.mapv(|p| !p).confusion_matrix(dataset),
             dataset.records.shape()[0] as f64 / start.elapsed().as_secs_f64(),
         )
     }
@@ -49,7 +54,11 @@ pub mod svm {
             nu: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
             degree: [2, 3, 4, 5],
             cnst: [1, 2, 3, 4, 5],
-            kernel: [String::from("linear"), String::from("poly"), String::from("gaussian")],
+            kernel: [
+                String::from("linear"),
+                String::from("poly"),
+                String::from("gaussian"),
+            ],
         };
         let mut results = Vec::<(String, f64, f64, f64, f64, u8, u8, f32)>::new();
         for kernel in params.kernel {

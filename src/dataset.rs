@@ -1,6 +1,5 @@
 use csv::{StringRecord, Writer};
 use linfa::dataset::Dataset;
-use ndarray::prelude::*;
 use ndarray::{Array1, Array2};
 use ndarray_stats::QuantileExt;
 use std::collections::HashMap;
@@ -16,8 +15,8 @@ struct Packet {
     flag: bool,
 }
 
-const WINDOW_SIZE: usize = 3000;
-const WINDOW_SLIDE: usize = 1000;
+const WINDOW_SIZE: usize = 1000;
+const WINDOW_SLIDE: usize = 100;
 const ATTACK_THRESHOLD: f64 = 0.1;
 
 pub fn write_features(
@@ -27,16 +26,18 @@ pub fn write_features(
 ) -> Result<(), csv::Error> {
     if is_libsvm {
         let mut file = fs::File::create(path).expect("Could not create file.");
-        let _targets = dataset.targets.clone().into_raw_vec();
-        for (_i, record) in dataset.records.outer_iter().enumerate() {
+        for (record, target) in dataset
+            .records
+            .outer_iter()
+            .zip(dataset.targets.clone().into_raw_vec())
+        {
             file.write_all(
                 format!(
-                    "0 1:{} 2:{} 3:{}\n",
-                    // if _targets[_i] { "-1" } else { "+1" },
+                    "{} 1:{} 2:{} 3:{}\n",
+                    if target { "-1" } else { "+1" },
                     record[0],
                     record[1],
-                    record[2],
-                    // record[3]
+                    record[2]
                 )
                 .as_bytes(),
             )
@@ -46,17 +47,61 @@ pub fn write_features(
         let mut wtr = Writer::from_path(path)?;
         match wtr.write_record(dataset.feature_names()) {
             Ok(()) => {
-                for (i, record) in dataset.records.outer_iter().enumerate() {
+                for (record, target) in dataset
+                    .records
+                    .outer_iter()
+                    .zip(dataset.targets.clone().into_raw_vec())
+                {
                     wtr.write_record(&[
                         record[0].to_string(),
                         record[1].to_string(),
                         record[2].to_string(),
-                        dataset.targets.slice(s![i, 0]).to_string(),
+                        target.to_string(),
                     ])?;
                 }
                 wtr.flush()?;
-            },
-            Err(why) => panic!("Could not write to {}: {}", path.display(), why)
+            }
+            Err(why) => panic!("Could not write to {}: {}", path.display(), why),
+        }
+    }
+    Ok(())
+}
+
+pub fn write_features_unsupervised(
+    path: &Path,
+    dataset: &mut Dataset<f64, ()>,
+    is_libsvm: bool,
+) -> Result<(), csv::Error> {
+    if is_libsvm {
+        let mut file = fs::File::create(path).expect("Could not create file.");
+        let _targets = dataset.targets.clone().into_raw_vec();
+        for (_i, record) in dataset.records.outer_iter().enumerate() {
+            file.write_all(
+                format!(
+                    "0 1:{} 2:{} 3:{}\n",
+                    record[0],
+                    record[1],
+                    record[2]
+                )
+                .as_bytes(),
+            )
+            .expect("Unable to write to file.");
+        }
+    } else {
+        let mut wtr = Writer::from_path(path)?;
+        match wtr.write_record(dataset.feature_names()) {
+            Ok(()) => {
+                for record in dataset.records.outer_iter()
+                {
+                    wtr.write_record(&[
+                        record[0].to_string(),
+                        record[1].to_string(),
+                        record[2].to_string()
+                    ])?;
+                }
+                wtr.flush()?;
+            }
+            Err(why) => panic!("Could not write to {}: {}", path.display(), why),
         }
     }
     Ok(())
@@ -116,13 +161,23 @@ fn extract_features(packets: &[Packet]) -> [f64; 3] {
         }
         entropy.push(0.0 - probs.iter().map(|p| p * p.log2()).sum::<f64>());
         if val.1.len() > 1 {
-            hamming.push(val.1.windows(2).map(|b| {
-                let mut count = 0;
-                for (b1, b2) in b[0].iter().zip(b[1]) {
-                    if *b1 != b2 { count += 1 }
-                }
-                count
-            }).collect::<Vec<u32>>().iter().sum::<u32>() as f64 / (val.1.len() - 1) as f64);
+            hamming.push(
+                val.1
+                    .windows(2)
+                    .map(|b| {
+                        let mut count = 0;
+                        for (b1, b2) in b[0].iter().zip(b[1]) {
+                            if *b1 != b2 {
+                                count += 1
+                            }
+                        }
+                        count
+                    })
+                    .collect::<Vec<u32>>()
+                    .iter()
+                    .sum::<u32>() as f64
+                    / (val.1.len() - 1) as f64,
+            );
         }
     }
 
@@ -132,7 +187,7 @@ fn extract_features(packets: &[Packet]) -> [f64; 3] {
         // general_entropy,
         avg_time.iter().sum::<f64>() / avg_time.len() as f64,
         entropy.iter().sum::<f64>() / entropy.len() as f64,
-        hamming.iter().sum::<f64>() / hamming.len() as f64
+        hamming.iter().sum::<f64>() / hamming.len() as f64,
     ]
 }
 
@@ -250,7 +305,7 @@ pub fn load(
     let mut features = Vec::new();
     let mut labels = Vec::new();
 
-    for path in &paths {
+    for path in paths {
         let mut window: Vec<Packet> = Vec::with_capacity(WINDOW_SIZE);
         let mut buffer: Vec<Packet> = Vec::with_capacity(WINDOW_SLIDE);
         println!("Loading {}", path.display());
@@ -295,7 +350,10 @@ pub fn load(
                     //         break;
                     //     }
                     // }
-                    labels.push(window.iter().filter(|&p| p.flag).count() as f64 > WINDOW_SIZE as f64 * ATTACK_THRESHOLD);
+                    labels.push(
+                        window.iter().filter(|&p| p.flag).count() as f64
+                            > WINDOW_SIZE as f64 * ATTACK_THRESHOLD,
+                    );
                     window.drain(..WINDOW_SLIDE);
                 }
                 window.append(&mut buffer);
@@ -318,12 +376,7 @@ pub fn load(
         }
     }
     let mut dataset = Dataset::new(Array2::from(features), Array1::from(labels))
-        .with_feature_names(vec![
-            "AvgTime",
-            "Entropy",
-            "HammingDist",
-            "Label"
-        ]);
+        .with_feature_names(vec!["AvgTime", "Entropy", "HammingDist", "Label"]);
     if let Some(new_scaler) = normalize(&mut dataset, &scaler) {
         Ok((dataset, new_scaler))
     } else {
@@ -339,7 +392,7 @@ pub fn load_unsupervised(
     let mut features = Vec::new();
     let mut labels = Vec::new();
 
-    for path in &paths {
+    for path in paths {
         let mut window: Vec<Packet> = Vec::with_capacity(WINDOW_SIZE);
         let mut buffer: Vec<Packet> = Vec::with_capacity(WINDOW_SLIDE);
         println!("Loading {}", path.display());
@@ -400,16 +453,15 @@ pub fn load_unsupervised(
         }
     }
     let mut dataset = Dataset::new(Array2::from(features), Array1::from(labels))
-        .with_feature_names(vec![
-            "AvgTime",
-            "Entropy",
-            "HammingDist",
-            "Label"
-        ]);
+        .with_feature_names(vec!["AvgTime", "Entropy", "HammingDist"]);
     if let Some(new_scaler) = normalize_unsupervised(&mut dataset, &scaler) {
+        match std::fs::create_dir_all(Path::new("models")) {
+            Ok(_) => (),
+            Err(why) => panic!("Could not create models directory: {}", why),
+        };
         match fs::write("models/scaler", bincode::serialize(&new_scaler).unwrap()) {
             Ok(()) => (),
-            Err(why) => println!("Could not save scaler: {}", why)
+            Err(why) => println!("Could not save scaler: {}", why),
         }
         Ok((dataset, new_scaler))
     } else {
