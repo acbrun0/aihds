@@ -7,6 +7,7 @@ pub mod svm {
     use std::fs;
     use std::path::Path;
     use std::time::Instant;
+    use ndarray::{ArrayBase, ViewRepr, Dim};
 
     pub fn train(dataset: &Dataset<f64, ()>) -> Result<Svm<f64, bool>, linfa_svm::SvmError> {
         Svm::<f64, _>::params()
@@ -14,6 +15,10 @@ pub mod svm {
             .polynomial_kernel(0.0, 7.0)
             .nu_weight(0.001)
             .fit(dataset)
+    }
+
+    pub fn predict(model: &Svm<f64, bool>, features: ArrayBase<ViewRepr<&f64>, Dim<[usize; 1]>>) -> bool{
+        model.predict(features)
     }
 
     pub fn test(

@@ -31,6 +31,9 @@ struct Args {
     /// Join features into a single file
     #[clap(long)]
     join: bool,
+    /// Run model in streaming fashion
+    #[clap(long)]
+    streaming: bool
 }
 
 fn main() -> Result<(), Error> {
@@ -180,21 +183,29 @@ fn main() -> Result<(), Error> {
                             let test_paths: Vec<&Path> = test_paths.iter().map(Path::new).collect();
                             match dataset::load(test_paths, Some(scaler)) {
                                 Ok((test_dataset, _)) => {
-                                    let (result, speed) = svm::test(&test_dataset, model);
-                                    println!("Classification speed: {:.2} packets/s", speed);
-                                    match result {
-                                        Ok(confusion_matrix) => {
-                                            println!("{:#?}", confusion_matrix);
-                                            println!(
-                                                        "Accuracy: {:.3}%\nPrecision: {:.3}%\nRecall: {:.3}%\nF1-Score: {:.3}%",
-                                                        confusion_matrix.accuracy() * 100.0,
-                                                        confusion_matrix.precision() * 100.0,
-                                                        confusion_matrix.recall() * 100.0,
-                                                        confusion_matrix.f1_score() * 100.0
-                                                    );
+                                    if args.streaming {
+                                        for (i, record) in test_dataset.records.outer_iter().enumerate() {
+                                            if !svm::predict(&model, record) {
+                                                println!("Window {}: Found attack!", i);
+                                            }
                                         }
-                                        Err(why) => {
-                                            panic!("Could not compute confusion matrix: {}", why)
+                                    } else {
+                                        let (result, speed) = svm::test(&test_dataset, model);
+                                        println!("Classification speed: {:.2} packets/s", speed);
+                                        match result {
+                                            Ok(confusion_matrix) => {
+                                                println!("{:#?}", confusion_matrix);
+                                                println!(
+                                                            "Accuracy: {:.3}%\nPrecision: {:.3}%\nRecall: {:.3}%\nF1-Score: {:.3}%",
+                                                            confusion_matrix.accuracy() * 100.0,
+                                                            confusion_matrix.precision() * 100.0,
+                                                            confusion_matrix.recall() * 100.0,
+                                                            confusion_matrix.f1_score() * 100.0
+                                                        );
+                                            }
+                                            Err(why) => {
+                                                panic!("Could not compute confusion matrix: {}", why)
+                                            }
                                         }
                                     }
                                 }
@@ -221,20 +232,28 @@ fn main() -> Result<(), Error> {
                     let scaler = bincode::deserialize(&fs::read("models/scaler").unwrap()).unwrap();
                     match dataset::load(test_paths, Some(scaler)) {
                         Ok((test_dataset, _)) => {
-                            let (result, speed) = svm::test(&test_dataset, model);
-                            println!("Classification speed: {:.2} packets/s", speed);
-                            match result {
-                                Ok(confusion_matrix) => {
-                                    println!("{:#?}", confusion_matrix);
-                                    println!(
-                                            "Accuracy: {:.3}%\nPrecision: {:.3}%\nRecall: {:.3}%\nF1-Score: {:.3}%",
-                                            confusion_matrix.accuracy() * 100.0,
-                                            confusion_matrix.precision() * 100.0,
-                                            confusion_matrix.recall() * 100.0,
-                                            confusion_matrix.f1_score() * 100.0
-                                        );
+                            if args.streaming {
+                                for (i, record) in test_dataset.records.outer_iter().enumerate() {
+                                    if !svm::predict(&model, record) {
+                                        println!("Window {}: Found attack!", i);
+                                    }
                                 }
-                                Err(why) => panic!("Could not compute confusion matrix: {}", why),
+                            } else {
+                                let (result, speed) = svm::test(&test_dataset, model);
+                                println!("Classification speed: {:.2} packets/s", speed);
+                                match result {
+                                    Ok(confusion_matrix) => {
+                                        println!("{:#?}", confusion_matrix);
+                                        println!(
+                                                "Accuracy: {:.3}%\nPrecision: {:.3}%\nRecall: {:.3}%\nF1-Score: {:.3}%",
+                                                confusion_matrix.accuracy() * 100.0,
+                                                confusion_matrix.precision() * 100.0,
+                                                confusion_matrix.recall() * 100.0,
+                                                confusion_matrix.f1_score() * 100.0
+                                            );
+                                    }
+                                    Err(why) => panic!("Could not compute confusion matrix: {}", why),
+                                }
                             }
                         }
                         Err(why) => panic!("Could not load test datasets: {}", why),
