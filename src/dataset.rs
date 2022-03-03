@@ -120,13 +120,13 @@ fn extract_features(packets: &[Packet]) -> [f64; 3] {
     let mut avg_time = Vec::new();
     let mut entropy = Vec::new();
     let mut hamming: Vec<f64> = Vec::new();
-    let mut general_entropy = 0.0;
+    let mut _general_entropy = 0.0;
 
     for p in packets {
         ts.push(p.timestamp);
         let prob =
             packets.iter().filter(|&x| x.data == p.data).count() as f64 / packets.len() as f64;
-        general_entropy += 0.0 - prob * prob.log2();
+        _general_entropy += 0.0 - prob * prob.log2();
         let stat = feat.entry(p.id).or_insert((Vec::new(), Vec::new()));
         stat.0.push(p.timestamp);
         stat.1.push(p.data);
