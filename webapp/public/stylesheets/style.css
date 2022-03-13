@@ -1,0 +1,20 @@
+body {
+  padding: 50px;
+  font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
+}
+
+a {
+  color: #00B7FF;
+}
+
+.title {
+  text-align: center;
+}
+
+.light_fig {
+  width: 100px;
+  height: 100px;
+  margin: auto;
+  display: block;
+  opacity: 0.5;
+}

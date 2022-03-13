@@ -10,15 +10,16 @@ use std::path::Path;
 
 struct Packet {
     timestamp: f64,
-    id: u16,
+    id: String,
     data: [u8; 8],
     flag: bool,
 }
 
-const WINDOW_SIZE: usize = 1000;
-const WINDOW_SLIDE: usize = 100;
+const WINDOW_SIZE: usize = 200;
+const WINDOW_SLIDE: usize = 50;
 const ATTACK_THRESHOLD: f64 = 0.1;
 
+#[allow(dead_code)]
 pub fn write_features(
     path: &Path,
     dataset: &mut Dataset<f64, bool>,
@@ -77,13 +78,7 @@ pub fn write_features_unsupervised(
         let _targets = dataset.targets.clone().into_raw_vec();
         for (_i, record) in dataset.records.outer_iter().enumerate() {
             file.write_all(
-                format!(
-                    "0 1:{} 2:{} 3:{}\n",
-                    record[0],
-                    record[1],
-                    record[2]
-                )
-                .as_bytes(),
+                format!("0 1:{} 2:{} 3:{}\n", record[0], record[1], record[2]).as_bytes(),
             )
             .expect("Unable to write to file.");
         }
@@ -91,12 +86,11 @@ pub fn write_features_unsupervised(
         let mut wtr = Writer::from_path(path)?;
         match wtr.write_record(dataset.feature_names()) {
             Ok(()) => {
-                for record in dataset.records.outer_iter()
-                {
+                for record in dataset.records.outer_iter() {
                     wtr.write_record(&[
                         record[0].to_string(),
                         record[1].to_string(),
-                        record[2].to_string()
+                        record[2].to_string(),
                     ])?;
                 }
                 wtr.flush()?;
@@ -127,7 +121,7 @@ fn extract_features(packets: &[Packet]) -> [f64; 3] {
         let prob =
             packets.iter().filter(|&x| x.data == p.data).count() as f64 / packets.len() as f64;
         _general_entropy += 0.0 - prob * prob.log2();
-        let stat = feat.entry(p.id).or_insert((Vec::new(), Vec::new()));
+        let stat = feat.entry(p.id.clone()).or_insert((Vec::new(), Vec::new()));
         stat.0.push(p.timestamp);
         stat.1.push(p.data);
     }
@@ -310,7 +304,7 @@ pub fn load(
         let mut buffer: Vec<Packet> = Vec::with_capacity(WINDOW_SLIDE);
         println!("Loading {}", path.display());
         for record in csv::ReaderBuilder::new()
-            .has_headers(false)
+            .has_headers(true)
             .flexible(true)
             .from_path(path)?
             .records()
@@ -322,7 +316,7 @@ pub fn load(
                 Err(why) => panic!("Could not parse: {}", why),
             };
 
-            let id = u16::from_str_radix(fields.get(1).unwrap(), 16).unwrap();
+            let id = fields.get(1).unwrap();
 
             let dlc: u8 = match fields.get(2).unwrap().parse() {
                 Ok(dlc) => dlc,
@@ -361,14 +355,14 @@ pub fn load(
             if window.len() < window.capacity() {
                 window.push(Packet {
                     timestamp,
-                    id,
+                    id: String::from(id),
                     data,
                     flag,
                 });
             } else {
                 buffer.push(Packet {
                     timestamp,
-                    id,
+                    id: String::from(id),
                     data,
                     flag,
                 });
@@ -396,11 +390,12 @@ pub fn load_unsupervised(
         let mut window: Vec<Packet> = Vec::with_capacity(WINDOW_SIZE);
         let mut buffer: Vec<Packet> = Vec::with_capacity(WINDOW_SLIDE);
         println!("Loading {}", path.display());
-        for record in csv::ReaderBuilder::new()
-            .has_headers(false)
+        for (i, record) in csv::ReaderBuilder::new()
+            .has_headers(true)
             .flexible(true)
             .from_path(path)?
             .records()
+            .enumerate()
         {
             let fields: StringRecord = record?;
 
@@ -409,11 +404,16 @@ pub fn load_unsupervised(
                 Err(why) => panic!("Could not parse: {}", why),
             };
 
-            let id = u16::from_str_radix(fields.get(1).unwrap(), 16).unwrap();
+            let id = fields.get(1).unwrap();
 
             let dlc: u8 = match fields.get(2).unwrap().parse() {
                 Ok(dlc) => dlc,
-                Err(why) => panic!("Could not parse: {}", why),
+                Err(why) => panic!(
+                    "Could not parse {:?} from record #{}: {}",
+                    fields.get(2),
+                    i,
+                    why
+                ),
             };
 
             let mut data = [0; 8];
@@ -438,14 +438,14 @@ pub fn load_unsupervised(
             if window.len() < window.capacity() {
                 window.push(Packet {
                     timestamp,
-                    id,
+                    id: String::from(id),
                     data,
                     flag,
                 });
             } else {
                 buffer.push(Packet {
                     timestamp,
-                    id,
+                    id: String::from(id),
                     data,
                     flag,
                 });

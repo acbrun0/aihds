@@ -1,5 +1,6 @@
 mod dataset;
 mod model;
+mod server;
 
 use clap::Parser;
 use linfa::prelude::*;
@@ -18,7 +19,7 @@ struct Args {
     test: Option<String>,
     /// Path to model to be loaded
     #[clap(long)]
-    load: Option<String>,
+    model: Option<String>,
     /// Extracts features to CSV files
     #[clap(long)]
     extract_features: bool,
@@ -31,12 +32,13 @@ struct Args {
     /// Join features into a single file
     #[clap(long)]
     join: bool,
-    /// Run model in streaming fashion
+    /// Run model in streaming mode
     #[clap(long)]
-    streaming: bool
+    streaming: bool,
 }
 
-fn main() -> Result<(), Error> {
+#[tokio::main]
+async fn main() -> Result<(), Error> {
     let args = Args::parse();
 
     if args.extract_features {
@@ -72,7 +74,11 @@ fn main() -> Result<(), Error> {
                                 "features/{}.csv",
                                 path.file_stem().unwrap().to_str().unwrap()
                             );
-                            match dataset::write_features_unsupervised(Path::new(&fp), &mut dataset, false) {
+                            match dataset::write_features_unsupervised(
+                                Path::new(&fp),
+                                &mut dataset,
+                                false,
+                            ) {
                                 Ok(_) => (),
                                 Err(why) => {
                                     println!("Could not write features to {}: {}", fp, why)
@@ -98,9 +104,9 @@ fn main() -> Result<(), Error> {
             let paths = paths.split(',').collect::<Vec<&str>>();
             let paths = paths.iter().map(Path::new).collect();
             if args.join {
-                match dataset::load(paths, scaler) {
+                match dataset::load_unsupervised(paths, scaler) {
                     Ok((mut dataset, _)) => {
-                        match dataset::write_features(
+                        match dataset::write_features_unsupervised(
                             Path::new(&format!(
                                 "{}/targets.txt",
                                 if args.libsvm { "libsvm" } else { "features" }
@@ -117,14 +123,18 @@ fn main() -> Result<(), Error> {
             } else {
                 let mut scaler_copy = scaler;
                 for path in paths {
-                    match dataset::load(vec![path], scaler_copy) {
+                    match dataset::load_unsupervised(vec![path], scaler_copy) {
                         Ok((mut dataset, scaler)) => {
                             scaler_copy = Some(scaler);
                             let fp = format!(
                                 "features/{}.csv",
                                 path.file_stem().unwrap().to_str().unwrap()
                             );
-                            match dataset::write_features(Path::new(&fp), &mut dataset, false) {
+                            match dataset::write_features_unsupervised(
+                                Path::new(&fp),
+                                &mut dataset,
+                                false,
+                            ) {
                                 Ok(_) => (),
                                 Err(why) => {
                                     println!("Could not write features to {}: {}", fp, why)
@@ -167,7 +177,7 @@ fn main() -> Result<(), Error> {
             }
             None => panic!("Did not provide path to train datasets."),
         }
-    } else if args.load.is_none() {
+    } else if args.model.is_none() {
         if let Some(paths) = args.train {
             let train_paths: Vec<&str> = paths.split(',').collect();
             let train_paths: Vec<&Path> = train_paths.iter().map(Path::new).collect();
@@ -181,15 +191,31 @@ fn main() -> Result<(), Error> {
                         if let Some(paths) = args.test {
                             let test_paths: Vec<&str> = paths.split(',').collect();
                             let test_paths: Vec<&Path> = test_paths.iter().map(Path::new).collect();
-                            match dataset::load(test_paths, Some(scaler)) {
-                                Ok((test_dataset, _)) => {
-                                    if args.streaming {
-                                        for (i, record) in test_dataset.records.outer_iter().enumerate() {
-                                            if !svm::predict(&model, record) {
-                                                println!("Window {}: Found attack!", i);
+                            if args.streaming {
+                                match dataset::load_unsupervised(test_paths, Some(scaler)) {
+                                    Ok((test_dataset, _)) => {
+                                        let client = reqwest::Client::new();
+                                        for record in test_dataset.records.outer_iter() {
+                                            match server::post(
+                                                &client,
+                                                record.to_vec().iter().map(|v| *v as f32).collect(),
+                                                &svm::predict(&model, record),
+                                            )
+                                            .await
+                                            {
+                                                Ok(_) => (),
+                                                Err(why) => println!(
+                                                    "Could not communicate with server: {}",
+                                                    why
+                                                ),
                                             }
                                         }
-                                    } else {
+                                    }
+                                    Err(why) => panic!("Could not load test datasets: {}", why),
+                                }
+                            } else {
+                                match dataset::load(test_paths, Some(scaler)) {
+                                    Ok((test_dataset, _)) => {
                                         let (result, speed) = svm::test(&test_dataset, model);
                                         println!("Classification speed: {:.2} packets/s", speed);
                                         match result {
@@ -204,12 +230,15 @@ fn main() -> Result<(), Error> {
                                                         );
                                             }
                                             Err(why) => {
-                                                panic!("Could not compute confusion matrix: {}", why)
+                                                panic!(
+                                                    "Could not compute confusion matrix: {}",
+                                                    why
+                                                )
                                             }
                                         }
                                     }
+                                    Err(why) => panic!("Could not load test datasets: {}", why),
                                 }
-                                Err(why) => panic!("Could not load test datasets: {}", why),
                             }
                         }
                     }
@@ -223,22 +252,37 @@ fn main() -> Result<(), Error> {
     } else {
         // Load model
         println!("Loading model...");
-        let modelpath = args.load.unwrap();
+        let modelpath = args.model.unwrap();
         match svm::load(Path::new(&modelpath)) {
             Ok(model) => {
                 if let Some(paths) = args.test {
                     let test_paths: Vec<&str> = paths.split(',').collect();
                     let test_paths: Vec<&Path> = test_paths.iter().map(Path::new).collect();
                     let scaler = bincode::deserialize(&fs::read("models/scaler").unwrap()).unwrap();
-                    match dataset::load(test_paths, Some(scaler)) {
-                        Ok((test_dataset, _)) => {
-                            if args.streaming {
-                                for (i, record) in test_dataset.records.outer_iter().enumerate() {
-                                    if !svm::predict(&model, record) {
-                                        println!("Window {}: Found attack!", i);
+                    if args.streaming {
+                        match dataset::load_unsupervised(test_paths, Some(scaler)) {
+                            Ok((test_dataset, _)) => {
+                                let client = reqwest::Client::new();
+                                for record in test_dataset.records.outer_iter() {
+                                    match server::post(
+                                        &client,
+                                        record.to_vec().iter().map(|v| *v as f32).collect(),
+                                        &svm::predict(&model, record),
+                                    )
+                                    .await
+                                    {
+                                        Ok(_) => (),
+                                        Err(why) => {
+                                            println!("Could not communicate with server: {}", why)
+                                        }
                                     }
                                 }
-                            } else {
+                            }
+                            Err(why) => panic!("Could not load test datasets: {}", why),
+                        }
+                    } else {
+                        match dataset::load(test_paths, Some(scaler)) {
+                            Ok((test_dataset, _)) => {
                                 let (result, speed) = svm::test(&test_dataset, model);
                                 println!("Classification speed: {:.2} packets/s", speed);
                                 match result {
@@ -252,11 +296,13 @@ fn main() -> Result<(), Error> {
                                                 confusion_matrix.f1_score() * 100.0
                                             );
                                     }
-                                    Err(why) => panic!("Could not compute confusion matrix: {}", why),
+                                    Err(why) => {
+                                        panic!("Could not compute confusion matrix: {}", why)
+                                    }
                                 }
                             }
+                            Err(why) => panic!("Could not load test datasets: {}", why),
                         }
-                        Err(why) => panic!("Could not load test datasets: {}", why),
                     }
                 }
             }

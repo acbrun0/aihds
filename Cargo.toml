@@ -4,11 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-csv = "1.1"
-clap = { version = "3.0", features = ["derive"]}
-linfa = "0.5"
-linfa-svm = {version = "0.5", features = ["serde"]}
-ndarray = "0.15"
-ndarray-stats = "0.5"
-bincode = "1.3"
-serde = "1.0"
+csv = "1"
+clap = { version = "3", features = ["derive"]}
+linfa = "0"
+linfa-svm = {version = "0", features = ["serde"]}
+ndarray = "0"
+ndarray-stats = "0"
+bincode = "1"
+serde = "1"
+reqwest = { version = "0", features = ["json"] }
+tokio = { version = "1", features = ["full"] }

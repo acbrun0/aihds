@@ -4,20 +4,23 @@ use std::path::Path;
 pub mod svm {
     use linfa::prelude::*;
     use linfa_svm::Svm;
+    use ndarray::{ArrayBase, Dim, ViewRepr};
     use std::fs;
     use std::path::Path;
     use std::time::Instant;
-    use ndarray::{ArrayBase, ViewRepr, Dim};
 
     pub fn train(dataset: &Dataset<f64, ()>) -> Result<Svm<f64, bool>, linfa_svm::SvmError> {
         Svm::<f64, _>::params()
-            // .gaussian_kernel(1.0)
-            .polynomial_kernel(0.0, 7.0)
+            .gaussian_kernel(0.1)
+            // .polynomial_kernel(0.0, 7.0)
             .nu_weight(0.001)
             .fit(dataset)
     }
 
-    pub fn predict(model: &Svm<f64, bool>, features: ArrayBase<ViewRepr<&f64>, Dim<[usize; 1]>>) -> bool{
+    pub fn predict(
+        model: &Svm<f64, bool>,
+        features: ArrayBase<ViewRepr<&f64>, Dim<[usize; 1]>>,
+    ) -> bool {
         model.predict(features)
     }
 
