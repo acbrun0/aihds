@@ -108,7 +108,7 @@ pub fn write_features_unsupervised(
 //  - General entropy
 //  - Entropy between packets of the same ID;
 //  - Average Hamming distance between packets of the same ID
-fn extract_features(packets: &[Packet]) -> [f64; 3] {
+fn extract_features(packets: &[Packet], monitor: &Option<Vec<String>>) -> [f64; 3] {
     let mut feat = HashMap::new();
     let mut ts = Vec::new();
     let mut avg_time = Vec::new();
@@ -116,73 +116,91 @@ fn extract_features(packets: &[Packet]) -> [f64; 3] {
     let mut hamming: Vec<f64> = Vec::new();
     let mut _general_entropy = 0.0;
 
-    for p in packets {
-        ts.push(p.timestamp);
-        let prob =
-            packets.iter().filter(|&x| x.data == p.data).count() as f64 / packets.len() as f64;
-        _general_entropy += 0.0 - prob * prob.log2();
-        let stat = feat.entry(p.id.clone()).or_insert((Vec::new(), Vec::new()));
-        stat.0.push(p.timestamp);
-        stat.1.push(p.data);
+    if let Some(ids) = monitor {
+        for p in packets {
+            if ids.contains(&p.id) {
+                ts.push(p.timestamp);
+                let prob = packets.iter().filter(|&x| x.data == p.data).count() as f64
+                    / packets.len() as f64;
+                _general_entropy += 0.0 - prob * prob.log2();
+                let stat = feat.entry(p.id.clone()).or_insert((Vec::new(), Vec::new()));
+                stat.0.push(p.timestamp);
+                stat.1.push(p.data);
+            }
+        }
+    } else {
+        for p in packets {
+            ts.push(p.timestamp);
+            let prob =
+                packets.iter().filter(|&x| x.data == p.data).count() as f64 / packets.len() as f64;
+            _general_entropy += 0.0 - prob * prob.log2();
+            let stat = feat.entry(p.id.clone()).or_insert((Vec::new(), Vec::new()));
+            stat.0.push(p.timestamp);
+            stat.1.push(p.data);
+        }
     }
 
-    ts = ts.windows(2).map(|w| w[1] - w[0]).collect::<Vec<f64>>();
-    ts[0] = 0.0;
-
-    for (_, val) in feat.iter_mut() {
-        if val.0.len() > 1 {
-            val.0 = val.0.windows(2).map(|w| w[1] - w[0]).collect::<Vec<f64>>();
-            val.0.swap_remove(0);
-        } else {
-            val.0[0] = 0.0;
+    if !feat.is_empty() {
+        if ts.len() > 1 {
+            ts = ts.windows(2).map(|w| w[1] - w[0]).collect::<Vec<f64>>();
         }
+        ts[0] = 0.0;
 
-        avg_time.push(if !val.0.is_empty() {
-            val.0.iter().sum::<f64>() / val.0.len() as f64
-        } else {
-            0.0
-        });
+        for (_, val) in feat.iter_mut() {
+            if val.0.len() > 1 {
+                val.0 = val.0.windows(2).map(|w| w[1] - w[0]).collect::<Vec<f64>>();
+                val.0.swap_remove(0);
+            } else {
+                val.0[0] = 0.0;
+            }
 
-        let n_packets = val.1.len();
-        let mut datamap = HashMap::new();
-        let mut probs = Vec::new();
-        for bytes in &val.1 {
-            let entry = datamap.entry(bytes).or_insert(0);
-            *entry += 1;
-        }
-        for count in datamap.values() {
-            probs.push(*count as f64 / n_packets as f64);
-        }
-        entropy.push(0.0 - probs.iter().map(|p| p * p.log2()).sum::<f64>());
-        if val.1.len() > 1 {
-            hamming.push(
-                val.1
-                    .windows(2)
-                    .map(|b| {
-                        let mut count = 0;
-                        for (b1, b2) in b[0].iter().zip(b[1]) {
-                            if *b1 != b2 {
-                                count += 1
+            avg_time.push(if !val.0.is_empty() {
+                val.0.iter().sum::<f64>() / val.0.len() as f64
+            } else {
+                0.0
+            });
+
+            let n_packets = val.1.len();
+            let mut datamap = HashMap::new();
+            let mut probs = Vec::new();
+            for bytes in &val.1 {
+                let entry = datamap.entry(bytes).or_insert(0);
+                *entry += 1;
+            }
+            for count in datamap.values() {
+                probs.push(*count as f64 / n_packets as f64);
+            }
+            entropy.push(0.0 - probs.iter().map(|p| p * p.log2()).sum::<f64>());
+            if val.1.len() > 1 {
+                hamming.push(
+                    val.1
+                        .windows(2)
+                        .map(|b| {
+                            let mut count = 0;
+                            for (b1, b2) in b[0].iter().zip(b[1]) {
+                                if *b1 != b2 {
+                                    count += 1
+                                }
                             }
-                        }
-                        count
-                    })
-                    .collect::<Vec<u32>>()
-                    .iter()
-                    .sum::<u32>() as f64
-                    / (val.1.len() - 1) as f64,
-            );
+                            count
+                        })
+                        .collect::<Vec<u32>>()
+                        .iter()
+                        .sum::<u32>() as f64
+                        / (val.1.len() - 1) as f64,
+                );
+            }
         }
-    }
 
-    [
-        // feat.len() as f64,
-        // ts.iter().sum::<f64>() / ts.len() as f64,
-        // general_entropy,
-        avg_time.iter().sum::<f64>() / avg_time.len() as f64,
-        entropy.iter().sum::<f64>() / entropy.len() as f64,
-        hamming.iter().sum::<f64>() / hamming.len() as f64,
-    ]
+        [
+            // feat.len() as f64,
+            // ts.iter().sum::<f64>() / ts.len() as f64,
+            // general_entropy,
+            avg_time.iter().sum::<f64>() / avg_time.len() as f64,
+            entropy.iter().sum::<f64>() / entropy.len() as f64,
+            hamming.iter().sum::<f64>() / hamming.len() as f64,
+        ]
+    } else { [0.0, 0.0, 0.0] }
 }
 
 #[allow(dead_code)]
@@ -295,6 +313,7 @@ fn normalize_unsupervised(
 pub fn load(
     paths: Vec<&Path>,
     scaler: Option<Vec<(f64, f64)>>,
+    monitor: &Option<Vec<String>>
 ) -> Result<(Dataset<f64, bool>, Vec<(f64, f64)>), csv::Error> {
     let mut features = Vec::new();
     let mut labels = Vec::new();
@@ -336,7 +355,7 @@ pub fn load(
 
             if buffer.len() == buffer.capacity() {
                 if window.len() == window.capacity() {
-                    features.push(extract_features(&window));
+                    features.push(extract_features(&window, monitor));
                     // let mut flag = false;
                     // for p in &window {
                     //     if p.flag {
@@ -382,6 +401,7 @@ pub fn load(
 pub fn load_unsupervised(
     paths: Vec<&Path>,
     scaler: Option<Vec<(f64, f64)>>,
+    monitor: &Option<Vec<String>>
 ) -> Result<(Dataset<f64, ()>, Vec<(f64, f64)>), csv::Error> {
     let mut features = Vec::new();
     let mut labels = Vec::new();
@@ -429,7 +449,7 @@ pub fn load_unsupervised(
 
             if buffer.len() == buffer.capacity() {
                 if window.len() == window.capacity() {
-                    features.push(extract_features(&window));
+                    features.push(extract_features(&window, monitor));
                     window.drain(..WINDOW_SLIDE);
                 }
                 window.append(&mut buffer);
