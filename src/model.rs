@@ -1,5 +1,179 @@
-use std::fs;
-use std::path::Path;
+use linfa::prelude::*;
+use linfa_svm::Svm;
+use ndarray::{Array1, ArrayBase, Dim, OwnedRepr};
+use std::{collections::HashMap, fs, path::Path, time::Instant};
+
+pub struct Packet {
+    timestamp: Instant,
+    id: u32,
+    data: Vec<u8>,
+}
+
+impl Packet {
+    pub fn new(timestamp: Instant, id: u32, data: Vec<u8>) -> Packet {
+        Packet {
+            timestamp,
+            id,
+            data,
+        }
+    }
+}
+
+pub struct IDS {
+    model: Svm<f64, bool>,
+    buffer: Vec<Packet>,
+    window: Vec<Packet>,
+    monitor: Option<Vec<u32>>,
+}
+
+impl IDS {
+    pub fn new(
+        model: Svm<f64, bool>,
+        window_size: usize,
+        window_slide: usize,
+        monitor: Option<Vec<u32>>,
+    ) -> IDS {
+        IDS {
+            model,
+            window: Vec::with_capacity(window_size),
+            buffer: Vec::with_capacity(window_slide),
+            monitor,
+        }
+    }
+
+    pub fn push(&mut self, packet: Packet) -> Option<(Vec<f64>, bool)> {
+        let mut prediction: Option<(Vec<f64>, bool)> = None;
+
+        if self.buffer.len() == self.buffer.capacity() {
+            if self.window.len() == self.window.capacity() {
+                prediction = Some(self.predict());
+                self.window.drain(..self.buffer.len());
+            }
+            self.window.append(&mut self.buffer);
+        }
+
+        if self.window.len() < self.window.capacity() {
+            self.window.push(packet);
+        } else {
+            self.buffer.push(packet);
+        }
+
+        prediction
+    }
+
+    pub fn predict(&self) -> (Vec<f64>, bool) {
+        let features = self.extract_features();
+        (features.to_vec(), self.model.predict(features))
+    }
+
+    fn extract_features(&self) -> ArrayBase<OwnedRepr<f64>, Dim<[usize; 1]>> {
+        let mut feat = HashMap::new();
+        let mut ts = Vec::new();
+        let mut avg_time = Vec::new();
+        let mut entropy = Vec::new();
+        let mut hamming: Vec<f64> = Vec::new();
+        let mut _general_entropy = 0.0;
+
+        if let Some(ids) = &self.monitor {
+            for p in &self.window {
+                if ids.contains(&p.id) {
+                    ts.push(p.timestamp);
+                    let prob = self.window.iter().filter(|&x| x.data == p.data).count() as f64
+                        / self.window.len() as f64;
+                    _general_entropy += 0.0 - prob * prob.log2();
+                    let stat = feat.entry(p.id.clone()).or_insert((Vec::new(), Vec::new()));
+                    stat.0.push(p.timestamp);
+                    stat.1.push(p.data.clone());
+                }
+            }
+        } else {
+            for p in &self.window {
+                ts.push(p.timestamp);
+                let prob = self.window.iter().filter(|&x| x.data == p.data).count() as f64
+                    / self.window.len() as f64;
+                _general_entropy += 0.0 - prob * prob.log2();
+                let stat = feat.entry(p.id.clone()).or_insert((Vec::new(), Vec::new()));
+                stat.0.push(p.timestamp);
+                stat.1.push(p.data.clone());
+            }
+        }
+
+        if !feat.is_empty() {
+            let mut interval = Vec::new();
+            if ts.len() > 1 {
+                interval = ts
+                    .windows(2)
+                    .map(|w| w[1].duration_since(w[0]).as_micros())
+                    .collect::<Vec<u128>>();
+            }
+            if interval.is_empty() {
+                interval.push(0);
+            }
+
+            for (_, val) in feat.iter_mut() {
+                let mut id_interval = Vec::new();
+                if val.0.len() > 1 {
+                    id_interval = val
+                        .0
+                        .windows(2)
+                        .map(|w| w[1].duration_since(w[0]).as_micros())
+                        .collect::<Vec<u128>>();
+                    id_interval.swap_remove(0);
+                } else {
+                    id_interval.push(0);
+                }
+
+                avg_time.push(if !val.0.is_empty() {
+                    id_interval.iter().sum::<u128>() as f64 / val.0.len() as f64
+                } else {
+                    0.0
+                });
+
+                let n_packets = val.1.len();
+                let mut datamap = HashMap::new();
+                let mut probs = Vec::new();
+                for bytes in &val.1 {
+                    let entry = datamap.entry(bytes).or_insert(0);
+                    *entry += 1;
+                }
+                for count in datamap.values() {
+                    probs.push(*count as f64 / n_packets as f64);
+                }
+                entropy.push(0.0 - probs.iter().map(|p| p * p.log2()).sum::<f64>());
+                if val.1.len() > 1 {
+                    hamming.push(
+                        val.1
+                            .windows(2)
+                            .map(|b| {
+                                let mut count = 0;
+                                for (b1, b2) in b[0].iter().zip(b[1].clone()) {
+                                    if *b1 != b2 {
+                                        count += 1
+                                    }
+                                }
+                                count
+                            })
+                            .collect::<Vec<u32>>()
+                            .iter()
+                            .sum::<u32>() as f64
+                            / (val.1.len() - 1) as f64,
+                    );
+                }
+            }
+
+            Array1::from(vec![
+                // feat.len() as f64,
+                // ts.iter().sum::<f64>() / ts.len() as f64,
+                // general_entropy,
+                avg_time.iter().sum::<f64>() / avg_time.len() as f64,
+                entropy.iter().sum::<f64>() / entropy.len() as f64,
+                hamming.iter().sum::<f64>() / hamming.len() as f64,
+            ])
+        } else {
+            Array1::from(vec![0.0, 0.0, 0.0])
+        }
+    }
+}
 
 pub mod svm {
     use linfa::prelude::*;

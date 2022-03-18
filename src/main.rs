@@ -5,8 +5,8 @@ mod server;
 use clap::Parser;
 use linfa::prelude::*;
 use model::svm;
-use std::fs;
-use std::path::Path;
+use model::{Packet, IDS};
+use std::{fs, path::Path, time::Instant};
 
 #[derive(Parser)]
 #[clap(author, version, about)]
@@ -34,7 +34,7 @@ struct Args {
     join: bool,
     /// Run model in streaming mode
     #[clap(long)]
-    streaming: bool,
+    streaming: Option<String>,
     /// IDs to monitor
     #[clap(long)]
     monitor: Option<String>,
@@ -46,7 +46,15 @@ async fn main() -> Result<(), Error> {
     let mut monitor: Option<Vec<String>> = None;
 
     if args.monitor.is_some() {
-        monitor = Some(args.monitor.unwrap().split(',').collect::<Vec<&str>>().iter().map(|s| String::from(*s)).collect());
+        monitor = Some(
+            args.monitor
+                .unwrap()
+                .split(',')
+                .collect::<Vec<&str>>()
+                .iter()
+                .map(|s| String::from(*s))
+                .collect(),
+        );
     }
 
     if args.extract_features {
@@ -186,26 +194,29 @@ async fn main() -> Result<(), Error> {
             None => panic!("Did not provide path to train datasets."),
         }
     } else if args.model.is_none() {
-        if let Some(paths) = args.train {
-            let train_paths: Vec<&str> = paths.split(',').collect();
-            let train_paths: Vec<&Path> = train_paths.iter().map(Path::new).collect();
-            match dataset::load_unsupervised(train_paths, None, &monitor) {
-                Ok((train_dataset, scaler)) => match svm::train(&train_dataset) {
-                    Ok(model) => {
-                        match model::save(&model, Path::new("models/svm")) {
-                            Ok(_) => (),
-                            Err(why) => println!("Could not save model: {}", why),
-                        }
-                        if let Some(paths) = args.test {
-                            let test_paths: Vec<&str> = paths.split(',').collect();
-                            let test_paths: Vec<&Path> = test_paths.iter().map(Path::new).collect();
-                            if args.streaming {
-                                match dataset::load_unsupervised(test_paths, Some(scaler), &monitor) {
+        if let Some(url) = args.streaming {
+            if let Some(paths) = args.train {
+                let train_paths: Vec<&str> = paths.split(',').collect();
+                let train_paths: Vec<&Path> = train_paths.iter().map(Path::new).collect();
+                match dataset::load_unsupervised(train_paths, None, &monitor) {
+                    Ok((train_dataset, scaler)) => match svm::train(&train_dataset) {
+                        Ok(model) => {
+                            match model::save(&model, Path::new("models/svm")) {
+                                Ok(_) => (),
+                                Err(why) => println!("Could not save model: {}", why),
+                            }
+                            if let Some(paths) = args.test {
+                                let test_paths: Vec<&str> = paths.split(',').collect();
+                                let test_paths: Vec<&Path> =
+                                    test_paths.iter().map(Path::new).collect();
+                                match dataset::load_unsupervised(test_paths, Some(scaler), &monitor)
+                                {
                                     Ok((test_dataset, _)) => {
                                         let client = reqwest::Client::new();
                                         for record in test_dataset.records.outer_iter() {
                                             match server::post(
                                                 &client,
+                                                &url,
                                                 record.to_vec().iter().map(|v| *v as f32).collect(),
                                                 &svm::predict(&model, record),
                                             )
@@ -221,7 +232,38 @@ async fn main() -> Result<(), Error> {
                                     }
                                     Err(why) => panic!("Could not load test datasets: {}", why),
                                 }
-                            } else {
+                            }
+                        }
+                        Err(why) => panic!("Could not train model: {}", why),
+                    },
+                    Err(why) => panic!("Could not load train datasets: {}", why),
+                }
+            } else {
+                match server::open_socket("can0") {
+                    Ok(socket) => loop {
+                        match socket.read_frame() {
+                            Ok(frame) => println!("{:#?}", frame),
+                            Err(why) => panic!("Could not read frame: {}", why),
+                        }
+                    },
+                    Err(why) => panic!("Could not open socket: {}", why),
+                }
+            }
+        } else {
+            if let Some(paths) = args.train {
+                let train_paths: Vec<&str> = paths.split(',').collect();
+                let train_paths: Vec<&Path> = train_paths.iter().map(Path::new).collect();
+                match dataset::load_unsupervised(train_paths, None, &monitor) {
+                    Ok((train_dataset, scaler)) => match svm::train(&train_dataset) {
+                        Ok(model) => {
+                            match model::save(&model, Path::new("models/svm")) {
+                                Ok(_) => (),
+                                Err(why) => println!("Could not save model: {}", why),
+                            }
+                            if let Some(paths) = args.test {
+                                let test_paths: Vec<&str> = paths.split(',').collect();
+                                let test_paths: Vec<&Path> =
+                                    test_paths.iter().map(Path::new).collect();
                                 match dataset::load(test_paths, Some(scaler), &monitor) {
                                     Ok((test_dataset, _)) => {
                                         let (result, speed) = svm::test(&test_dataset, model);
@@ -249,13 +291,11 @@ async fn main() -> Result<(), Error> {
                                 }
                             }
                         }
-                    }
-                    Err(why) => panic!("Could not train model: {}", why),
-                },
-                Err(why) => panic!("Could not load train datasets: {}", why),
+                        Err(why) => panic!("Could not train model: {}", why),
+                    },
+                    Err(why) => panic!("Could not load train datasets: {}", why),
+                }
             }
-        } else {
-            panic!("Did not provide path to train datasets.")
         }
     } else {
         // Load model
@@ -263,17 +303,19 @@ async fn main() -> Result<(), Error> {
         let modelpath = args.model.unwrap();
         match svm::load(Path::new(&modelpath)) {
             Ok(model) => {
-                if let Some(paths) = args.test {
-                    let test_paths: Vec<&str> = paths.split(',').collect();
-                    let test_paths: Vec<&Path> = test_paths.iter().map(Path::new).collect();
-                    let scaler = bincode::deserialize(&fs::read("models/scaler").unwrap()).unwrap();
-                    if args.streaming {
+                if let Some(url) = args.streaming {
+                    if let Some(paths) = args.test {
+                        let test_paths: Vec<&str> = paths.split(',').collect();
+                        let test_paths: Vec<&Path> = test_paths.iter().map(Path::new).collect();
+                        let scaler =
+                            bincode::deserialize(&fs::read("models/scaler").unwrap()).unwrap();
                         match dataset::load_unsupervised(test_paths, Some(scaler), &monitor) {
                             Ok((test_dataset, _)) => {
                                 let client = reqwest::Client::new();
                                 for record in test_dataset.records.outer_iter() {
                                     match server::post(
                                         &client,
+                                        &url,
                                         record.to_vec().iter().map(|v| *v as f32).collect(),
                                         &svm::predict(&model, record),
                                     )
@@ -289,6 +331,40 @@ async fn main() -> Result<(), Error> {
                             Err(why) => panic!("Could not load test datasets: {}", why),
                         }
                     } else {
+                        match server::open_socket("can0") {
+                            Ok(socket) => {
+                                let client = reqwest::Client::new();
+                                let mut ids = IDS::new(model, 200, 50, None);
+                                loop {
+                                    match socket.read_frame() {
+                                        Ok(frame) => {
+                                            if let Some(result) = ids.push(Packet::new(
+                                                Instant::now(),
+                                                frame.id(),
+                                                frame.data().to_vec(),
+                                            )) {
+                                                // println!("{:?}", result);
+                                                match server::post(&client, &url, result.0.iter().map(|f| *f as f32).collect(), &result.1).await {
+                                                    Ok(_) => (),
+                                                    Err(why) => {
+                                                        println!("Could not communicate with server: {}", why)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        Err(why) => panic!("Could not read frame: {}", why),
+                                    }
+                                }
+                            }
+                            Err(why) => panic!("Could not open socket: {}", why),
+                        }
+                    }
+                } else {
+                    if let Some(paths) = args.test {
+                        let test_paths: Vec<&str> = paths.split(',').collect();
+                        let test_paths: Vec<&Path> = test_paths.iter().map(Path::new).collect();
+                        let scaler =
+                            bincode::deserialize(&fs::read("models/scaler").unwrap()).unwrap();
                         match dataset::load(test_paths, Some(scaler), &monitor) {
                             Ok((test_dataset, _)) => {
                                 let (result, speed) = svm::test(&test_dataset, model);
@@ -315,7 +391,7 @@ async fn main() -> Result<(), Error> {
                 }
             }
             Err(why) => panic!("Could not load model: {}", why),
-        };
+        }
     }
     Ok(())
 }
