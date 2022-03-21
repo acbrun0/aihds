@@ -35,11 +35,19 @@ struct Args {
     /// Run model in streaming mode
     #[clap(long)]
     streaming: bool,
+    /// IDs to monitor
+    #[clap(long)]
+    monitor: Option<String>,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     let args = Args::parse();
+    let mut monitor: Option<Vec<String>> = None;
+
+    if args.monitor.is_some() {
+        monitor = Some(args.monitor.unwrap().split(',').collect::<Vec<&str>>().iter().map(|s| String::from(*s)).collect());
+    }
 
     if args.extract_features {
         match std::fs::create_dir_all(Path::new("features")) {
@@ -50,7 +58,7 @@ async fn main() -> Result<(), Error> {
             let paths = paths.split(',').collect::<Vec<&str>>();
             let paths = paths.iter().map(Path::new).collect();
             if args.join {
-                match dataset::load_unsupervised(paths, None) {
+                match dataset::load_unsupervised(paths, None, &monitor) {
                     Ok((mut dataset, _)) => {
                         match dataset::write_features_unsupervised(
                             Path::new(&format!(
@@ -68,7 +76,7 @@ async fn main() -> Result<(), Error> {
                 }
             } else {
                 for path in paths {
-                    match dataset::load_unsupervised(vec![path], None) {
+                    match dataset::load_unsupervised(vec![path], None, &monitor) {
                         Ok((mut dataset, _)) => {
                             let fp = format!(
                                 "features/{}.csv",
@@ -104,7 +112,7 @@ async fn main() -> Result<(), Error> {
             let paths = paths.split(',').collect::<Vec<&str>>();
             let paths = paths.iter().map(Path::new).collect();
             if args.join {
-                match dataset::load_unsupervised(paths, scaler) {
+                match dataset::load_unsupervised(paths, scaler, &monitor) {
                     Ok((mut dataset, _)) => {
                         match dataset::write_features_unsupervised(
                             Path::new(&format!(
@@ -123,7 +131,7 @@ async fn main() -> Result<(), Error> {
             } else {
                 let mut scaler_copy = scaler;
                 for path in paths {
-                    match dataset::load_unsupervised(vec![path], scaler_copy) {
+                    match dataset::load_unsupervised(vec![path], scaler_copy, &monitor) {
                         Ok((mut dataset, scaler)) => {
                             scaler_copy = Some(scaler);
                             let fp = format!(
@@ -157,9 +165,9 @@ async fn main() -> Result<(), Error> {
                 if let Some(paths) = args.test {
                     let test_paths: Vec<&str> = paths.split(',').collect::<Vec<&str>>();
                     let test_paths: Vec<&Path> = test_paths.iter().map(Path::new).collect();
-                    match dataset::load_unsupervised(train_paths, None) {
+                    match dataset::load_unsupervised(train_paths, None, &monitor) {
                         Ok((train_dataset, scaler)) => {
-                            match dataset::load(test_paths, Some(scaler)) {
+                            match dataset::load(test_paths, Some(scaler), &monitor) {
                                 Ok((test_dataset, _)) => {
                                     match svm::grid_search(&train_dataset, &test_dataset) {
                                         Ok(results) => println!("{:#?}", results),
@@ -181,7 +189,7 @@ async fn main() -> Result<(), Error> {
         if let Some(paths) = args.train {
             let train_paths: Vec<&str> = paths.split(',').collect();
             let train_paths: Vec<&Path> = train_paths.iter().map(Path::new).collect();
-            match dataset::load_unsupervised(train_paths, None) {
+            match dataset::load_unsupervised(train_paths, None, &monitor) {
                 Ok((train_dataset, scaler)) => match svm::train(&train_dataset) {
                     Ok(model) => {
                         match model::save(&model, Path::new("models/svm")) {
@@ -192,7 +200,7 @@ async fn main() -> Result<(), Error> {
                             let test_paths: Vec<&str> = paths.split(',').collect();
                             let test_paths: Vec<&Path> = test_paths.iter().map(Path::new).collect();
                             if args.streaming {
-                                match dataset::load_unsupervised(test_paths, Some(scaler)) {
+                                match dataset::load_unsupervised(test_paths, Some(scaler), &monitor) {
                                     Ok((test_dataset, _)) => {
                                         let client = reqwest::Client::new();
                                         for record in test_dataset.records.outer_iter() {
@@ -214,7 +222,7 @@ async fn main() -> Result<(), Error> {
                                     Err(why) => panic!("Could not load test datasets: {}", why),
                                 }
                             } else {
-                                match dataset::load(test_paths, Some(scaler)) {
+                                match dataset::load(test_paths, Some(scaler), &monitor) {
                                     Ok((test_dataset, _)) => {
                                         let (result, speed) = svm::test(&test_dataset, model);
                                         println!("Classification speed: {:.2} packets/s", speed);
@@ -260,7 +268,7 @@ async fn main() -> Result<(), Error> {
                     let test_paths: Vec<&Path> = test_paths.iter().map(Path::new).collect();
                     let scaler = bincode::deserialize(&fs::read("models/scaler").unwrap()).unwrap();
                     if args.streaming {
-                        match dataset::load_unsupervised(test_paths, Some(scaler)) {
+                        match dataset::load_unsupervised(test_paths, Some(scaler), &monitor) {
                             Ok((test_dataset, _)) => {
                                 let client = reqwest::Client::new();
                                 for record in test_dataset.records.outer_iter() {
@@ -281,7 +289,7 @@ async fn main() -> Result<(), Error> {
                             Err(why) => panic!("Could not load test datasets: {}", why),
                         }
                     } else {
-                        match dataset::load(test_paths, Some(scaler)) {
+                        match dataset::load(test_paths, Some(scaler), &monitor) {
                             Ok((test_dataset, _)) => {
                                 let (result, speed) = svm::test(&test_dataset, model);
                                 println!("Classification speed: {:.2} packets/s", speed);

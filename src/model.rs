@@ -12,7 +12,7 @@ pub mod svm {
     pub fn train(dataset: &Dataset<f64, ()>) -> Result<Svm<f64, bool>, linfa_svm::SvmError> {
         Svm::<f64, _>::params()
             .gaussian_kernel(0.1)
-            // .polynomial_kernel(0.0, 7.0)
+            // .polynomial_kernel(2.0, 3.0)
             .nu_weight(0.001)
             .fit(dataset)
     }
@@ -31,8 +31,8 @@ pub mod svm {
         let start = Instant::now();
         let pred = model.predict(dataset);
         (
-            pred.confusion_matrix(dataset),
-            // pred.mapv(|p| !p).confusion_matrix(dataset),
+            // pred.confusion_matrix(dataset),
+            pred.mapv(|p| !p).confusion_matrix(dataset),
             dataset.records.shape()[0] as f64 / start.elapsed().as_secs_f64(),
         )
     }

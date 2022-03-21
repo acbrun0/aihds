@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+openssl = { version = "0", features = ["vendored"] }
 csv = "1"
 clap = { version = "3", features = ["derive"]}
 linfa = "0"
