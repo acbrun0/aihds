@@ -290,7 +290,7 @@ fn normalize(
     }
 }
 
-fn normalize_unsupervised(
+pub fn normalize_unsupervised(
     dataset: &mut Dataset<f64, ()>,
     params: &Option<Vec<(f64, f64)>>,
 ) -> Option<Vec<(f64, f64)>> {

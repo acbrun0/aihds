@@ -5,7 +5,9 @@ mod server;
 use clap::Parser;
 use linfa::prelude::*;
 use model::svm;
-use model::{Packet, IDS};
+use model::{Ids, Packet};
+use std::io;
+use std::io::Write;
 use std::{fs, path::Path, time::Instant};
 
 #[derive(Parser)]
@@ -38,7 +40,14 @@ struct Args {
     /// IDs to monitor
     #[clap(long)]
     monitor: Option<String>,
+    /// Run IDS in live mode
+    #[clap(long)]
+    live: bool,
 }
+
+const BASELINE_SIZE: usize = 100000;
+const WINDOW_SIZE: usize = 200;
+const WINDOW_SLIDE: u16 = 50;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -193,6 +202,54 @@ async fn main() -> Result<(), Error> {
             }
             None => panic!("Did not provide path to train datasets."),
         }
+    } else if args.live {
+        let mut baseline: Vec<Packet> = Vec::with_capacity(BASELINE_SIZE);
+        match server::open_socket("can0") {
+            Ok(socket) => {
+                println!("Gathering baseline...");
+                while baseline.len() <= BASELINE_SIZE {
+                    match socket.read_frame() {
+                        Ok(frame) => {
+                            baseline.push(Packet::new(
+                                Instant::now(),
+                                frame.id(),
+                                frame.data().to_vec(),
+                            ));
+                            if baseline.len() as f32 % (BASELINE_SIZE as f32 * 0.05) == 0.0 {
+                                print!(
+                                    "{:.0}%\r",
+                                    baseline.len() as f32 / BASELINE_SIZE as f32 * 100.0
+                                );
+                                io::stdout().flush().unwrap();
+                            }
+                        }
+                        Err(why) => panic!("Could not read frame: {}", why),
+                    }
+                }
+                let mut ids = Ids::new(None, None, WINDOW_SIZE, WINDOW_SLIDE, None);
+                println!("Training model...");
+                ids.train(baseline);
+                println!("Training complete");
+                println!("Analysing network...");
+                loop {
+                    match socket.read_frame() {
+                        Ok(frame) => {
+                            if let Some(result) = ids.push(Packet::new(
+                                Instant::now(),
+                                frame.id(),
+                                frame.data().to_vec(),
+                            )) {
+                                if result.1 {
+                                    println!("{:?}", result);
+                                }
+                            }
+                        }
+                        Err(why) => panic!("Could not read frame: {}", why),
+                    }
+                }
+            }
+            Err(why) => panic!("Could not open socket: {}", why),
+        }
     } else if args.model.is_none() {
         if let Some(url) = args.streaming {
             if let Some(paths) = args.train {
@@ -218,7 +275,7 @@ async fn main() -> Result<(), Error> {
                                                 &client,
                                                 &url,
                                                 record.to_vec().iter().map(|v| *v as f32).collect(),
-                                                &svm::predict(&model, record),
+                                                &!svm::predict(&model, record),
                                             )
                                             .await
                                             {
@@ -249,52 +306,46 @@ async fn main() -> Result<(), Error> {
                     Err(why) => panic!("Could not open socket: {}", why),
                 }
             }
-        } else {
-            if let Some(paths) = args.train {
-                let train_paths: Vec<&str> = paths.split(',').collect();
-                let train_paths: Vec<&Path> = train_paths.iter().map(Path::new).collect();
-                match dataset::load_unsupervised(train_paths, None, &monitor) {
-                    Ok((train_dataset, scaler)) => match svm::train(&train_dataset) {
-                        Ok(model) => {
-                            match model::save(&model, Path::new("models/svm")) {
-                                Ok(_) => (),
-                                Err(why) => println!("Could not save model: {}", why),
-                            }
-                            if let Some(paths) = args.test {
-                                let test_paths: Vec<&str> = paths.split(',').collect();
-                                let test_paths: Vec<&Path> =
-                                    test_paths.iter().map(Path::new).collect();
-                                match dataset::load(test_paths, Some(scaler), &monitor) {
-                                    Ok((test_dataset, _)) => {
-                                        let (result, speed) = svm::test(&test_dataset, model);
-                                        println!("Classification speed: {:.2} packets/s", speed);
-                                        match result {
-                                            Ok(confusion_matrix) => {
-                                                println!("{:#?}", confusion_matrix);
-                                                println!(
+        } else if let Some(paths) = args.train {
+            let train_paths: Vec<&str> = paths.split(',').collect();
+            let train_paths: Vec<&Path> = train_paths.iter().map(Path::new).collect();
+            match dataset::load_unsupervised(train_paths, None, &monitor) {
+                Ok((train_dataset, scaler)) => match svm::train(&train_dataset) {
+                    Ok(model) => {
+                        match model::save(&model, Path::new("models/svm")) {
+                            Ok(_) => (),
+                            Err(why) => println!("Could not save model: {}", why),
+                        }
+                        if let Some(paths) = args.test {
+                            let test_paths: Vec<&str> = paths.split(',').collect();
+                            let test_paths: Vec<&Path> = test_paths.iter().map(Path::new).collect();
+                            match dataset::load(test_paths, Some(scaler), &monitor) {
+                                Ok((test_dataset, _)) => {
+                                    let (result, speed) = svm::test(&test_dataset, model);
+                                    println!("Classification speed: {:.2} packets/s", speed);
+                                    match result {
+                                        Ok(confusion_matrix) => {
+                                            println!("{:#?}", confusion_matrix);
+                                            println!(
                                                             "Accuracy: {:.3}%\nPrecision: {:.3}%\nRecall: {:.3}%\nF1-Score: {:.3}%",
                                                             confusion_matrix.accuracy() * 100.0,
                                                             confusion_matrix.precision() * 100.0,
                                                             confusion_matrix.recall() * 100.0,
                                                             confusion_matrix.f1_score() * 100.0
                                                         );
-                                            }
-                                            Err(why) => {
-                                                panic!(
-                                                    "Could not compute confusion matrix: {}",
-                                                    why
-                                                )
-                                            }
+                                        }
+                                        Err(why) => {
+                                            panic!("Could not compute confusion matrix: {}", why)
                                         }
                                     }
-                                    Err(why) => panic!("Could not load test datasets: {}", why),
                                 }
+                                Err(why) => panic!("Could not load test datasets: {}", why),
                             }
                         }
-                        Err(why) => panic!("Could not train model: {}", why),
-                    },
-                    Err(why) => panic!("Could not load train datasets: {}", why),
-                }
+                    }
+                    Err(why) => panic!("Could not train model: {}", why),
+                },
+                Err(why) => panic!("Could not load train datasets: {}", why),
             }
         }
     } else {
@@ -334,7 +385,10 @@ async fn main() -> Result<(), Error> {
                         match server::open_socket("can0") {
                             Ok(socket) => {
                                 let client = reqwest::Client::new();
-                                let mut ids = IDS::new(model, 200, 50, None);
+                                let scaler =
+                                    bincode::deserialize(&fs::read("models/scaler").unwrap())
+                                        .unwrap();
+                                let mut ids = Ids::new(Some(model), Some(scaler), 200, 50, None);
                                 loop {
                                     match socket.read_frame() {
                                         Ok(frame) => {
@@ -369,34 +423,31 @@ async fn main() -> Result<(), Error> {
                             Err(why) => panic!("Could not open socket: {}", why),
                         }
                     }
-                } else {
-                    if let Some(paths) = args.test {
-                        let test_paths: Vec<&str> = paths.split(',').collect();
-                        let test_paths: Vec<&Path> = test_paths.iter().map(Path::new).collect();
-                        let scaler =
-                            bincode::deserialize(&fs::read("models/scaler").unwrap()).unwrap();
-                        match dataset::load(test_paths, Some(scaler), &monitor) {
-                            Ok((test_dataset, _)) => {
-                                let (result, speed) = svm::test(&test_dataset, model);
-                                println!("Classification speed: {:.2} packets/s", speed);
-                                match result {
-                                    Ok(confusion_matrix) => {
-                                        println!("{:#?}", confusion_matrix);
-                                        println!(
+                } else if let Some(paths) = args.test {
+                    let test_paths: Vec<&str> = paths.split(',').collect();
+                    let test_paths: Vec<&Path> = test_paths.iter().map(Path::new).collect();
+                    let scaler = bincode::deserialize(&fs::read("models/scaler").unwrap()).unwrap();
+                    match dataset::load(test_paths, Some(scaler), &monitor) {
+                        Ok((test_dataset, _)) => {
+                            let (result, speed) = svm::test(&test_dataset, model);
+                            println!("Classification speed: {:.2} packets/s", speed);
+                            match result {
+                                Ok(confusion_matrix) => {
+                                    println!("{:#?}", confusion_matrix);
+                                    println!(
                                                 "Accuracy: {:.3}%\nPrecision: {:.3}%\nRecall: {:.3}%\nF1-Score: {:.3}%",
                                                 confusion_matrix.accuracy() * 100.0,
                                                 confusion_matrix.precision() * 100.0,
                                                 confusion_matrix.recall() * 100.0,
                                                 confusion_matrix.f1_score() * 100.0
                                             );
-                                    }
-                                    Err(why) => {
-                                        panic!("Could not compute confusion matrix: {}", why)
-                                    }
+                                }
+                                Err(why) => {
+                                    panic!("Could not compute confusion matrix: {}", why)
                                 }
                             }
-                            Err(why) => panic!("Could not load test datasets: {}", why),
                         }
+                        Err(why) => panic!("Could not load test datasets: {}", why),
                     }
                 }
             }
