@@ -344,10 +344,20 @@ async fn main() -> Result<(), Error> {
                                                 frame.data().to_vec(),
                                             )) {
                                                 // println!("{:?}", result);
-                                                match server::post(&client, &url, result.0.iter().map(|f| *f as f32).collect(), &result.1).await {
+                                                match server::post(
+                                                    &client,
+                                                    &url,
+                                                    result.0.iter().map(|f| *f as f32).collect(),
+                                                    &result.1,
+                                                )
+                                                .await
+                                                {
                                                     Ok(_) => (),
                                                     Err(why) => {
-                                                        println!("Could not communicate with server: {}", why)
+                                                        println!(
+                                                            "Could not communicate with server: {}",
+                                                            why
+                                                        )
                                                     }
                                                 }
                                             }

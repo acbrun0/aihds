@@ -10,5 +10,9 @@ pub async fn post(
     features: Vec<f32>,
     result: &bool,
 ) -> Result<reqwest::Response, reqwest::Error> {
-    client.post(format!("http://{}", url)).json(&(features, result)).send().await
+    client
+        .post(format!("http://{}", url))
+        .json(&(features, result))
+        .send()
+        .await
 }
