@@ -1,6 +1,7 @@
+use crate::dataset;
 use linfa::prelude::*;
 use linfa_svm::Svm;
-use ndarray::{Array1, ArrayBase, Dim, OwnedRepr};
+use ndarray::{Array1, Array2, ArrayBase, Dim, OwnedRepr};
 use std::{collections::HashMap, fs, path::Path, time::Instant};
 
 pub struct Packet {
@@ -19,51 +20,112 @@ impl Packet {
     }
 }
 
-pub struct IDS {
-    model: Svm<f64, bool>,
-    buffer: Vec<Packet>,
+pub struct Ids {
+    model: Option<Svm<f64, bool>>,
+    scaler: Option<Vec<(f64, f64)>>,
     window: Vec<Packet>,
+    slide: u16,
+    counter: u16,
     monitor: Option<Vec<u32>>,
 }
 
-impl IDS {
+impl Ids {
     pub fn new(
-        model: Svm<f64, bool>,
+        model: Option<Svm<f64, bool>>,
+        scaler: Option<Vec<(f64, f64)>>,
         window_size: usize,
-        window_slide: usize,
+        window_slide: u16,
         monitor: Option<Vec<u32>>,
-    ) -> IDS {
-        IDS {
+    ) -> Ids {
+        Ids {
             model,
+            scaler,
             window: Vec::with_capacity(window_size),
-            buffer: Vec::with_capacity(window_slide),
+            slide: window_slide,
+            counter: 0,
             monitor,
+        }
+    }
+
+    pub fn train(&mut self, packets: Vec<Packet>) {
+        let mut features: Vec<[f64; 3]> = Vec::new();
+        let mut labels = Vec::new();
+
+        for packet in packets {
+            if self.window.len() < self.window.capacity() {
+                self.window.push(packet);
+            } else {
+                self.window.remove(0);
+                self.window.push(packet);
+                self.counter += 1;
+                if self.counter == self.slide {
+                    let mut feat: [f64; 3] = [0.0, 0.0, 0.0];
+                    for (i, f) in self.extract_features().iter().enumerate() {
+                        feat[i] = *f;
+                    }
+                    features.push(feat);
+                    labels.push(());
+                    self.counter = 0;
+                }
+            }
+        }
+
+        let mut dataset = Dataset::new(Array2::from(features), Array1::from(labels));
+        self.scaler = dataset::normalize_unsupervised(&mut dataset, &None);
+
+        match svm::train(&dataset) {
+            Ok(model) => {
+                match std::fs::create_dir_all(Path::new("models")) {
+                    Ok(_) => {
+                        fs::write("models/scaler", bincode::serialize(&self.scaler).unwrap())
+                            .expect("Could not save scaler.");
+                        save(&model, Path::new("models/svm")).expect("Could not save model");
+                    }
+                    Err(why) => panic!("Could not create models directory: {}", why),
+                };
+                self.model = Some(model);
+            }
+            Err(why) => panic!("Could not train model: {}", why),
         }
     }
 
     pub fn push(&mut self, packet: Packet) -> Option<(Vec<f64>, bool)> {
         let mut prediction: Option<(Vec<f64>, bool)> = None;
 
-        if self.buffer.len() == self.buffer.capacity() {
-            if self.window.len() == self.window.capacity() {
-                prediction = Some(self.predict());
-                self.window.drain(..self.buffer.len());
-            }
-            self.window.append(&mut self.buffer);
-        }
-
         if self.window.len() < self.window.capacity() {
             self.window.push(packet);
         } else {
-            self.buffer.push(packet);
+            self.window.remove(0);
+            self.window.push(packet);
+            self.counter += 1;
+            if self.counter == self.slide {
+                prediction = Some(self.predict());
+                self.counter = 0;
+            }
         }
 
         prediction
     }
 
-    pub fn predict(&self) -> (Vec<f64>, bool) {
-        let features = self.extract_features();
-        (features.to_vec(), self.model.predict(features))
+    fn predict(&self) -> (Vec<f64>, bool) {
+        if let Some(scaler) = &self.scaler {
+            if let Some(model) = &self.model {
+                let mut si = 0;
+                let features: Vec<f64> = self
+                    .extract_features()
+                    .iter()
+                    .map(|f| {
+                        si += 1;
+                        (f - scaler[si - 1].0) / (scaler[si - 1].1 - scaler[si - 1].0)
+                    })
+                    .collect();
+                (features.clone(), !model.predict(Array1::from(features)))
+            } else {
+                panic!("IDS does not have a model.");
+            }
+        } else {
+            panic!("IDS does not have a scaler.");
+        }
     }
 
     fn extract_features(&self) -> ArrayBase<OwnedRepr<f64>, Dim<[usize; 1]>> {
@@ -81,7 +143,7 @@ impl IDS {
                     let prob = self.window.iter().filter(|&x| x.data == p.data).count() as f64
                         / self.window.len() as f64;
                     _general_entropy += 0.0 - prob * prob.log2();
-                    let stat = feat.entry(p.id.clone()).or_insert((Vec::new(), Vec::new()));
+                    let stat = feat.entry(p.id).or_insert((Vec::new(), Vec::new()));
                     stat.0.push(p.timestamp);
                     stat.1.push(p.data.clone());
                 }
@@ -92,7 +154,7 @@ impl IDS {
                 let prob = self.window.iter().filter(|&x| x.data == p.data).count() as f64
                     / self.window.len() as f64;
                 _general_entropy += 0.0 - prob * prob.log2();
-                let stat = feat.entry(p.id.clone()).or_insert((Vec::new(), Vec::new()));
+                let stat = feat.entry(p.id).or_insert((Vec::new(), Vec::new()));
                 stat.0.push(p.timestamp);
                 stat.1.push(p.data.clone());
             }
@@ -185,9 +247,9 @@ pub mod svm {
 
     pub fn train(dataset: &Dataset<f64, ()>) -> Result<Svm<f64, bool>, linfa_svm::SvmError> {
         Svm::<f64, _>::params()
-            .gaussian_kernel(0.1)
+            .gaussian_kernel(0.01)
             // .polynomial_kernel(2.0, 3.0)
-            .nu_weight(0.001)
+            .nu_weight(0.01)
             .fit(dataset)
     }
 
