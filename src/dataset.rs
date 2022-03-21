@@ -200,7 +200,9 @@ fn extract_features(packets: &[Packet], monitor: &Option<Vec<String>>) -> [f64; 
             entropy.iter().sum::<f64>() / entropy.len() as f64,
             hamming.iter().sum::<f64>() / hamming.len() as f64,
         ]
-    } else { [0.0, 0.0, 0.0] }
+    } else {
+        [0.0, 0.0, 0.0]
+    }
 }
 
 #[allow(dead_code)]
@@ -313,7 +315,7 @@ fn normalize_unsupervised(
 pub fn load(
     paths: Vec<&Path>,
     scaler: Option<Vec<(f64, f64)>>,
-    monitor: &Option<Vec<String>>
+    monitor: &Option<Vec<String>>,
 ) -> Result<(Dataset<f64, bool>, Vec<(f64, f64)>), csv::Error> {
     let mut features = Vec::new();
     let mut labels = Vec::new();
@@ -401,7 +403,7 @@ pub fn load(
 pub fn load_unsupervised(
     paths: Vec<&Path>,
     scaler: Option<Vec<(f64, f64)>>,
-    monitor: &Option<Vec<String>>
+    monitor: &Option<Vec<String>>,
 ) -> Result<(Dataset<f64, ()>, Vec<(f64, f64)>), csv::Error> {
     let mut features = Vec::new();
     let mut labels = Vec::new();
