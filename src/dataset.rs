@@ -14,7 +14,6 @@ struct Packet {
 
 const WINDOW_SIZE: usize = 200;
 const WINDOW_SLIDE: usize = 50;
-const ATTACK_THRESHOLD: f64 = 0.1;
 
 #[allow(dead_code)]
 pub fn write_features(
@@ -355,17 +354,14 @@ pub fn load(
             if buffer.len() == buffer.capacity() {
                 if window.len() == window.capacity() {
                     features.push(extract_features(&window, monitor));
-                    // let mut flag = false;
-                    // for p in &window {
-                    //     if p.flag {
-                    //         flag = true;
-                    //         break;
-                    //     }
-                    // }
-                    labels.push(
-                        window.iter().filter(|&p| p.flag).count() as f64
-                            > WINDOW_SIZE as f64 * ATTACK_THRESHOLD,
-                    );
+                    let mut flag = false;
+                    for p in &window {
+                        if p.flag {
+                            flag = true;
+                            break;
+                        }
+                    }
+                    labels.push(flag);
                     window.drain(..WINDOW_SLIDE);
                 }
                 window.append(&mut buffer);
@@ -390,98 +386,6 @@ pub fn load(
     let mut dataset = Dataset::new(Array2::from(features), Array1::from(labels))
         .with_feature_names(vec!["AvgTime", "Entropy", "HammingDist", "Label"]);
     if let Some(new_scaler) = normalize(&mut dataset, &scaler) {
-        Ok((dataset, new_scaler))
-    } else {
-        Ok((dataset, scaler.unwrap()))
-    }
-}
-
-#[allow(clippy::type_complexity)]
-pub fn load_unsupervised(
-    paths: Vec<&Path>,
-    scaler: Option<Vec<(f64, f64)>>,
-    monitor: &Option<Vec<String>>,
-) -> Result<(Dataset<f64, ()>, Vec<(f64, f64)>), csv::Error> {
-    let mut features = Vec::new();
-    let mut labels = Vec::new();
-
-    for path in paths {
-        let mut window: Vec<Packet> = Vec::with_capacity(WINDOW_SIZE);
-        let mut buffer: Vec<Packet> = Vec::with_capacity(WINDOW_SLIDE);
-        println!("Loading {}", path.display());
-        for (i, record) in csv::ReaderBuilder::new()
-            .has_headers(true)
-            .flexible(true)
-            .from_path(path)?
-            .records()
-            .enumerate()
-        {
-            let fields: StringRecord = record?;
-
-            let timestamp = match fields.get(0).unwrap().parse() {
-                Ok(t) => t,
-                Err(why) => panic!("Could not parse: {}", why),
-            };
-
-            let id = fields.get(1).unwrap();
-
-            let dlc: u8 = match fields.get(2).unwrap().parse() {
-                Ok(dlc) => dlc,
-                Err(why) => panic!(
-                    "Could not parse {:?} from record #{}: {}",
-                    fields.get(2),
-                    i,
-                    why
-                ),
-            };
-
-            let mut data = [0; 8];
-            for (i, item) in data.iter_mut().enumerate().take(dlc as usize) {
-                *item = u8::from_str_radix(fields.get(i + 3).unwrap(), 16).unwrap();
-            }
-
-            let flag = if let Some(f) = fields.get(fields.len() - 1) {
-                f != "Normal"
-            } else {
-                false
-            };
-
-            if buffer.len() == buffer.capacity() {
-                if window.len() == window.capacity() {
-                    features.push(extract_features(&window, monitor));
-                    window.drain(..WINDOW_SLIDE);
-                }
-                window.append(&mut buffer);
-                labels.push(());
-            }
-            if window.len() < window.capacity() {
-                window.push(Packet {
-                    timestamp,
-                    id: String::from(id),
-                    data,
-                    flag,
-                });
-            } else {
-                buffer.push(Packet {
-                    timestamp,
-                    id: String::from(id),
-                    data,
-                    flag,
-                });
-            }
-        }
-    }
-    let mut dataset = Dataset::new(Array2::from(features), Array1::from(labels))
-        .with_feature_names(vec!["AvgTime", "Entropy", "HammingDist"]);
-    if let Some(new_scaler) = normalize_unsupervised(&mut dataset, &scaler) {
-        match std::fs::create_dir_all(Path::new("models")) {
-            Ok(_) => (),
-            Err(why) => panic!("Could not create models directory: {}", why),
-        };
-        match fs::write("models/scaler", bincode::serialize(&new_scaler).unwrap()) {
-            Ok(()) => (),
-            Err(why) => println!("Could not save scaler: {}", why),
-        }
         Ok((dataset, new_scaler))
     } else {
         Ok((dataset, scaler.unwrap()))

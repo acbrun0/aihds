@@ -95,7 +95,10 @@ impl Ids {
         let mut dataset = Dataset::new(Array2::from(features), Array1::from(labels));
         self.scaler = dataset::normalize_unsupervised(&mut dataset, &None);
 
-        dataset::write_features_unsupervised(Path::new("models/train.csv"), &dataset, false);
+        match dataset::write_features_unsupervised(Path::new("models/train.csv"), &dataset, false) {
+            Ok(_) => (),
+            Err(why) => println!("Could not save train features: {}", why)
+        }
 
         match Svm::<f64, _>::params()
             .gaussian_kernel(1.0)
@@ -138,7 +141,10 @@ impl Ids {
             Err(why) => panic!("Could not create log file: {}", why),
         }
 
-        dataset::write_features(Path::new("models/test.csv"), &Dataset::new(Array2::from(features), Array1::from(real.clone())), false);
+        match dataset::write_features(Path::new("models/test.csv"), &Dataset::new(Array2::from(features), Array1::from(real.clone())), false) {
+            Ok(_) => (),
+            Err(why) => println!("Could not save test features: {}", why)
+        }
 
         (real, predictions)
     }
@@ -290,39 +296,9 @@ impl Ids {
 }
 
 pub mod svm {
-    use linfa::{dataset::Pr, prelude::*};
     use linfa_svm::Svm;
-    use ndarray::{ArrayBase, Dim, ViewRepr};
     use std::fs;
     use std::path::Path;
-    use std::time::Instant;
-
-    pub fn train(dataset: &Dataset<f64, bool>) -> Result<Svm<f64, Pr>, linfa_svm::SvmError> {
-        Svm::<f64, Pr>::params()
-            .gaussian_kernel(0.01)
-            .nu_weight(0.01)
-            .fit(dataset)
-    }
-
-    pub fn predict(
-        model: &Svm<f64, bool>,
-        features: ArrayBase<ViewRepr<&f64>, Dim<[usize; 1]>>,
-    ) -> bool {
-        model.predict(features)
-    }
-
-    pub fn test(
-        dataset: &Dataset<f64, bool>,
-        model: Svm<f64, bool>,
-    ) -> (Result<ConfusionMatrix<bool>, linfa::Error>, f64) {
-        let start = Instant::now();
-        let pred = model.predict(dataset);
-        (
-            // pred.confusion_matrix(dataset),
-            pred.mapv(|p| !p).confusion_matrix(dataset),
-            dataset.records.shape()[0] as f64 / start.elapsed().as_secs_f64(),
-        )
-    }
 
     pub fn load(path: &Path) -> Result<Svm<f64, bool>, std::io::Error> {
         let bin = fs::read(path)?;

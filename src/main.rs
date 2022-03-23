@@ -69,13 +69,13 @@ async fn main() -> Result<(), Error> {
             let paths = paths.iter().map(Path::new).collect();
             if args.join {
                 match dataset::load(paths, None, &monitor) {
-                    Ok((mut dataset, _)) => {
+                    Ok((dataset, _)) => {
                         match dataset::write_features(
                             Path::new(&format!(
                                 "{}/features.csv",
                                 if args.libsvm { "libsvm" } else { "features" }
                             )),
-                            &mut dataset,
+                            &dataset,
                             args.libsvm,
                         ) {
                             Ok(_) => (),
@@ -87,13 +87,13 @@ async fn main() -> Result<(), Error> {
             } else {
                 for path in paths {
                     match dataset::load(vec![path], None, &monitor) {
-                        Ok((mut dataset, _)) => {
+                        Ok((dataset, _)) => {
                             match dataset::write_features(
                                 Path::new(&format!(
                                     "features/{}.csv",
                                     path.file_stem().unwrap().to_str().unwrap()
                                 )),
-                                &mut dataset,
+                                &dataset,
                                 false,
                             ) {
                                 Ok(_) => (),
@@ -122,13 +122,13 @@ async fn main() -> Result<(), Error> {
             let paths = paths.iter().map(Path::new).collect();
             if args.join {
                 match dataset::load(paths, scaler, &monitor) {
-                    Ok((mut dataset, _)) => {
+                    Ok((dataset, _)) => {
                         match dataset::write_features(
                             Path::new(&format!(
                                 "{}/targets.txt",
                                 if args.libsvm { "libsvm" } else { "features" }
                             )),
-                            &mut dataset,
+                            &dataset,
                             args.libsvm,
                         ) {
                             Ok(_) => (),
@@ -141,14 +141,14 @@ async fn main() -> Result<(), Error> {
                 let mut scaler_copy = scaler;
                 for path in paths {
                     match dataset::load(vec![path], scaler_copy, &monitor) {
-                        Ok((mut dataset, scaler)) => {
+                        Ok((dataset, scaler)) => {
                             scaler_copy = Some(scaler);
                             match dataset::write_features(
                                 Path::new(&format!(
                                     "features/{}.csv",
                                     path.file_stem().unwrap().to_str().unwrap()
                                 )),
-                                &mut dataset,
+                                &dataset,
                                 args.libsvm,
                             ) {
                                 Ok(_) => (),
@@ -194,6 +194,7 @@ async fn main() -> Result<(), Error> {
     //         None => panic!("Did not provide path to train datasets."),
     //     }
     // } else
+
     if args.live {
         let mut baseline: Vec<Packet> = Vec::with_capacity(BASELINE_SIZE);
         match server::open_socket("can0") {
