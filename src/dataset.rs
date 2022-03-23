@@ -1,12 +1,9 @@
+use crate::model;
 use csv::{StringRecord, Writer};
 use linfa::dataset::Dataset;
 use ndarray::{Array1, Array2};
 use ndarray_stats::QuantileExt;
-use std::collections::HashMap;
-use std::fs;
-use std::io::prelude::*;
-use std::iter::Iterator;
-use std::path::Path;
+use std::{collections::HashMap, fs, io::prelude::*, iter::Iterator, path::Path};
 
 struct Packet {
     timestamp: f64,
@@ -22,7 +19,7 @@ const ATTACK_THRESHOLD: f64 = 0.1;
 #[allow(dead_code)]
 pub fn write_features(
     path: &Path,
-    dataset: &mut Dataset<f64, bool>,
+    dataset: &Dataset<f64, bool>,
     is_libsvm: bool,
 ) -> Result<(), csv::Error> {
     if is_libsvm {
@@ -51,7 +48,7 @@ pub fn write_features(
                 for (record, target) in dataset
                     .records
                     .outer_iter()
-                    .zip(dataset.targets.clone().into_raw_vec())
+                    .zip(dataset.targets.clone())
                 {
                     wtr.write_record(&[
                         record[0].to_string(),
@@ -70,7 +67,7 @@ pub fn write_features(
 
 pub fn write_features_unsupervised(
     path: &Path,
-    dataset: &mut Dataset<f64, ()>,
+    dataset: &Dataset<f64, ()>,
     is_libsvm: bool,
 ) -> Result<(), csv::Error> {
     if is_libsvm {
@@ -269,7 +266,7 @@ fn standardize_unsupervised(
     }
 }
 
-fn normalize(
+pub fn normalize(
     dataset: &mut Dataset<f64, bool>,
     params: &Option<Vec<(f64, f64)>>,
 ) -> Option<Vec<(f64, f64)>> {
@@ -489,4 +486,60 @@ pub fn load_unsupervised(
     } else {
         Ok((dataset, scaler.unwrap()))
     }
+}
+
+pub fn packets_from_csv(paths: Vec<&Path>) -> Result<Vec<model::Packet>, csv::Error> {
+    let mut packets = Vec::new();
+    for path in paths {
+        for (i, record) in csv::ReaderBuilder::new()
+            .has_headers(true)
+            .flexible(true)
+            .from_path(path)?
+            .records()
+            .enumerate()
+        {
+            let fields: StringRecord = record?;
+
+            // Converts timestamp from seconds to nanoseconds
+            let timestamp = match fields.get(0).unwrap().replace('.', "").parse::<i64>(){
+                Ok(timestamp) => timestamp * 1000,
+                Err(why) => panic!("Could not parse {} to an integer: {}", fields.get(0).unwrap(), why)
+            };
+
+            let id = match u32::from_str_radix(fields.get(1).unwrap(), 16) {
+                Ok(int) => int,
+                Err(why) => panic!(
+                    "Could not convert {} to integer: {}",
+                    fields.get(1).unwrap(),
+                    why
+                ),
+            };
+
+            let dlc: u8 = match fields.get(2).unwrap().parse() {
+                Ok(dlc) => dlc,
+                Err(why) => panic!(
+                    "Could not parse {:?} from record #{}: {}",
+                    fields.get(2),
+                    i,
+                    why
+                ),
+            };
+
+            let mut bytes = [0; 8];
+            for (i, item) in bytes.iter_mut().enumerate().take(dlc as usize) {
+                *item = u8::from_str_radix(fields.get(i + 3).unwrap(), 16).unwrap();
+            }
+
+            let flag = {
+                if let Some(flag) = fields.get((3 + dlc + 1) as usize) {
+                    flag != "Normal"
+                } else {
+                    false
+                }
+            };
+
+            packets.push(model::Packet::new(timestamp, id, bytes.to_vec(), flag));
+        }
+    }
+    Ok(packets)
 }
