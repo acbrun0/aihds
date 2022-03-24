@@ -246,7 +246,7 @@ async fn main() -> Result<(), Error> {
                                 frame.data().to_vec(),
                                 false,
                             )) {
-                                if result.1 {
+                                if !result.1 {
                                     println!("{:?}", result);
                                 }
                             }
