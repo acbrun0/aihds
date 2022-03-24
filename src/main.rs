@@ -45,7 +45,7 @@ struct Args {
 
 const BASELINE_SIZE: usize = 100000;
 const WINDOW_SIZE: usize = 500;
-const WINDOW_SLIDE: u16 = 50;
+const WINDOW_SLIDE: u16 = 100;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -203,12 +203,24 @@ async fn main() -> Result<(), Error> {
                 while baseline.len() <= BASELINE_SIZE {
                     match socket.read_frame() {
                         Ok(frame) => {
-                            baseline.push(Packet::new(
-                                Utc::now().naive_local().timestamp_nanos(),
-                                frame.id(),
-                                frame.data().to_vec(),
-                                false,
-                            ));
+                            if let Some(monitor) = &monitor {
+                                if monitor.contains(&frame.id().to_string()) {
+                                    baseline.push(Packet::new(
+                                        Utc::now().naive_local().timestamp_nanos(),
+                                        frame.id().to_string(),
+                                        frame.data().to_vec(),
+                                        false,
+                                    ));
+                                } else {
+                                    baseline.push(Packet::new(
+                                        Utc::now().naive_local().timestamp_nanos(),
+                                        frame.id().to_string(),
+                                        frame.data().to_vec(),
+                                        false,
+                                    ));
+                                }
+                            }
+                            
                             if baseline.len() as f32 % (BASELINE_SIZE as f32 * 0.05) == 0.0 {
                                 print!(
                                     "{:.0}%\r",
@@ -220,7 +232,7 @@ async fn main() -> Result<(), Error> {
                         Err(why) => panic!("Could not read frame: {}", why),
                     }
                 }
-                let mut ids = Ids::new(None, None, WINDOW_SIZE, WINDOW_SLIDE, None);
+                let mut ids = Ids::new(None, None, WINDOW_SIZE, WINDOW_SLIDE, monitor);
                 println!("Training model...");
                 ids.train(baseline);
                 println!("Training complete");
@@ -230,7 +242,7 @@ async fn main() -> Result<(), Error> {
                         Ok(frame) => {
                             if let Some(result) = ids.push(Packet::new(
                                 Utc::now().naive_local().timestamp_nanos(),
-                                frame.id(),
+                                frame.id().to_string(),
                                 frame.data().to_vec(),
                                 false,
                             )) {
@@ -252,7 +264,7 @@ async fn main() -> Result<(), Error> {
                 let train_paths: Vec<&Path> = train_paths.iter().map(Path::new).collect();
                 match dataset::packets_from_csv(train_paths) {
                     Ok(packets) => {
-                        let mut ids = Ids::new(None, None, WINDOW_SIZE, WINDOW_SLIDE, None);
+                        let mut ids = Ids::new(None, None, WINDOW_SIZE, WINDOW_SLIDE, monitor);
                         ids.train(packets);
                         if let Some(paths) = args.test {
                             let test_paths: Vec<&str> = paths.split(',').collect();
@@ -298,7 +310,7 @@ async fn main() -> Result<(), Error> {
             let train_paths: Vec<&Path> = train_paths.iter().map(Path::new).collect();
             match dataset::packets_from_csv(train_paths) {
                 Ok(packets) => {
-                    let mut ids = Ids::new(None, None, WINDOW_SIZE, WINDOW_SLIDE, None);
+                    let mut ids = Ids::new(None, None, WINDOW_SIZE, WINDOW_SLIDE, monitor);
                     ids.train(packets);
                     if let Some(paths) = args.test {
                         let test_paths: Vec<&str> = paths.split(',').collect();
@@ -306,10 +318,7 @@ async fn main() -> Result<(), Error> {
                         match dataset::packets_from_csv(test_paths) {
                             Ok(packets) => {
                                 let (real, pred) = ids.test(packets);
-                                let pred: Vec<bool> = pred
-                                    .into_iter()
-                                    .map(|p| p.1)
-                                    .collect();
+                                let pred: Vec<bool> = pred.into_iter().map(|p| p.1).collect();
                                 let mut tp = 0;
                                 let mut fp = 0;
                                 let mut tn = 0;
@@ -352,7 +361,7 @@ async fn main() -> Result<(), Error> {
                             Ok(packets) => {
                                 let client = reqwest::Client::new();
                                 let mut ids =
-                                    Ids::new(Some(model), scaler, WINDOW_SIZE, WINDOW_SLIDE, None);
+                                    Ids::new(Some(model), scaler, WINDOW_SIZE, WINDOW_SLIDE, monitor);
                                 for packet in packets {
                                     if let Some(result) = ids.push(packet) {
                                         match server::post(
@@ -380,13 +389,13 @@ async fn main() -> Result<(), Error> {
                                 let scaler =
                                     bincode::deserialize(&fs::read("models/scaler").unwrap())
                                         .unwrap();
-                                let mut ids = Ids::new(Some(model), Some(scaler), 200, 50, None);
+                                let mut ids = Ids::new(Some(model), Some(scaler), 200, 50, monitor);
                                 loop {
                                     match socket.read_frame() {
                                         Ok(frame) => {
                                             if let Some(result) = ids.push(Packet::new(
                                                 Utc::now().naive_local().timestamp_nanos(),
-                                                frame.id(),
+                                                frame.id().to_string(),
                                                 frame.data().to_vec(),
                                                 false,
                                             )) {
@@ -427,13 +436,10 @@ async fn main() -> Result<(), Error> {
                                 Some(scaler),
                                 WINDOW_SIZE,
                                 WINDOW_SLIDE,
-                                None,
+                                monitor,
                             )
                             .test(packets);
-                            let pred: Vec<bool> = pred
-                                .into_iter()
-                                .map(|p| p.1)
-                                .collect();
+                            let pred: Vec<bool> = pred.into_iter().map(|p| p.1).collect();
                             let mut tp = 0;
                             let mut fp = 0;
                             let mut tn = 0;

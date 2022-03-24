@@ -15,7 +15,6 @@ struct Packet {
 const WINDOW_SIZE: usize = 200;
 const WINDOW_SLIDE: usize = 50;
 
-#[allow(dead_code)]
 pub fn write_features(
     path: &Path,
     dataset: &Dataset<f64, bool>,
@@ -44,11 +43,7 @@ pub fn write_features(
         let mut wtr = Writer::from_path(path)?;
         match wtr.write_record(dataset.feature_names()) {
             Ok(()) => {
-                for (record, target) in dataset
-                    .records
-                    .outer_iter()
-                    .zip(dataset.targets.clone())
-                {
+                for (record, target) in dataset.records.outer_iter().zip(dataset.targets.clone()) {
                     wtr.write_record(&[
                         record[0].to_string(),
                         record[1].to_string(),
@@ -201,88 +196,28 @@ fn extract_features(packets: &[Packet], monitor: &Option<Vec<String>>) -> model:
     }
 }
 
-#[allow(dead_code)]
-fn standardize(
-    dataset: &mut Dataset<f64, bool>,
-    params: &Option<Vec<(f64, f64)>>,
-) -> Option<Vec<(f64, f64)>> {
-    if let Some(params) = params {
-        for (i, mut col) in dataset.records.columns_mut().into_iter().enumerate() {
-            col.mapv_inplace(|v| (v - params[i].0) / params[i].1);
-        }
-        None
-    } else {
-        let mut params = Vec::new();
-        for col in dataset.records.columns() {
-            let count = col.len() as f64;
-            let mean = col.iter().sum::<f64>() / count;
-            let variance = col
-                .iter()
-                .map(|v| {
-                    let diff = mean - v;
-                    diff * diff
-                })
-                .sum::<f64>()
-                / count;
-            params.push((mean, variance.sqrt()));
-        }
-        for (i, mut col) in dataset.records.columns_mut().into_iter().enumerate() {
-            col.mapv_inplace(|v| (v - params[i].0) / params[i].1);
-        }
-        Some(params)
-    }
-}
-
-#[allow(dead_code)]
-fn standardize_unsupervised(
-    dataset: &mut Dataset<f64, ()>,
-    params: &Option<Vec<(f64, f64)>>,
-) -> Option<Vec<(f64, f64)>> {
-    if let Some(params) = params {
-        for (i, mut col) in dataset.records.columns_mut().into_iter().enumerate() {
-            col.mapv_inplace(|v| (v - params[i].0) / params[i].1);
-        }
-        None
-    } else {
-        let mut params = Vec::new();
-        for col in dataset.records.columns() {
-            let count = col.len() as f64;
-            let mean = col.iter().sum::<f64>() / count;
-            let variance = col
-                .iter()
-                .map(|v| {
-                    let diff = mean - v;
-                    diff * diff
-                })
-                .sum::<f64>()
-                / count;
-            params.push((mean, variance.sqrt()));
-        }
-        for (i, mut col) in dataset.records.columns_mut().into_iter().enumerate() {
-            col.mapv_inplace(|v| (v - params[i].0) / params[i].1);
-        }
-        Some(params)
-    }
-}
-
 pub fn normalize(
     dataset: &mut Dataset<f64, bool>,
     params: &Option<Vec<(f64, f64)>>,
 ) -> Option<Vec<(f64, f64)>> {
-    if let Some(params) = params {
-        for (i, mut col) in dataset.records.columns_mut().into_iter().enumerate() {
-            col.mapv_inplace(|v| (v - params[i].0) / (params[i].1 - params[i].0));
-        }
-        None
+    if dataset.records.is_empty() {
+        None    
     } else {
-        let mut params = Vec::new();
-        for col in dataset.records.columns() {
-            params.push((*col.min().unwrap(), *col.max().unwrap()));
+        if let Some(params) = params {
+            for (i, mut col) in dataset.records.columns_mut().into_iter().enumerate() {
+                col.mapv_inplace(|v| (v - params[i].0) / (params[i].1 - params[i].0));
+            }
+            None
+        } else {
+            let mut params = Vec::new();
+            for col in dataset.records.columns() {
+                params.push((*col.min().unwrap(), *col.max().unwrap()));
+            }
+            for (i, mut col) in dataset.records.columns_mut().into_iter().enumerate() {
+                col.mapv_inplace(|v| (v - params[i].0) / (params[i].1 - params[i].0));
+            }
+            Some(params)
         }
-        for (i, mut col) in dataset.records.columns_mut().into_iter().enumerate() {
-            col.mapv_inplace(|v| (v - params[i].0) / (params[i].1 - params[i].0));
-        }
-        Some(params)
     }
 }
 
@@ -290,20 +225,24 @@ pub fn normalize_unsupervised(
     dataset: &mut Dataset<f64, ()>,
     params: &Option<Vec<(f64, f64)>>,
 ) -> Option<Vec<(f64, f64)>> {
-    if let Some(params) = params {
-        for (i, mut col) in dataset.records.columns_mut().into_iter().enumerate() {
-            col.mapv_inplace(|v| (v - params[i].0) / (params[i].1 - params[i].0));
-        }
+    if dataset.records.is_empty() {
         None
     } else {
-        let mut params = Vec::new();
-        for col in dataset.records.columns() {
-            params.push((*col.min().unwrap(), *col.max().unwrap()));
+        if let Some(params) = params {
+            for (i, mut col) in dataset.records.columns_mut().into_iter().enumerate() {
+                col.mapv_inplace(|v| (v - params[i].0) / (params[i].1 - params[i].0));
+            }
+            None
+        } else {
+            let mut params = Vec::new();
+            for col in dataset.records.columns() {
+                params.push((*col.min().unwrap(), *col.max().unwrap()));
+            }
+            for (i, mut col) in dataset.records.columns_mut().into_iter().enumerate() {
+                col.mapv_inplace(|v| (v - params[i].0) / (params[i].1 - params[i].0));
+            }
+            Some(params)
         }
-        for (i, mut col) in dataset.records.columns_mut().into_iter().enumerate() {
-            col.mapv_inplace(|v| (v - params[i].0) / (params[i].1 - params[i].0));
-        }
-        Some(params)
     }
 }
 
@@ -405,19 +344,16 @@ pub fn packets_from_csv(paths: Vec<&Path>) -> Result<Vec<model::Packet>, csv::Er
             let fields: StringRecord = record?;
 
             // Converts timestamp from seconds to nanoseconds
-            let timestamp = match fields.get(0).unwrap().replace('.', "").parse::<i64>(){
+            let timestamp = match fields.get(0).unwrap().replace('.', "").parse::<i64>() {
                 Ok(timestamp) => timestamp * 1000,
-                Err(why) => panic!("Could not parse {} to an integer: {}", fields.get(0).unwrap(), why)
-            };
-
-            let id = match u32::from_str_radix(fields.get(1).unwrap(), 16) {
-                Ok(int) => int,
                 Err(why) => panic!(
-                    "Could not convert {} to integer: {}",
-                    fields.get(1).unwrap(),
+                    "Could not parse {} to an integer: {}",
+                    fields.get(0).unwrap(),
                     why
                 ),
             };
+
+            let id = String::from(fields.get(1).unwrap());
 
             let dlc: u8 = match fields.get(2).unwrap().parse() {
                 Ok(dlc) => dlc,
@@ -435,7 +371,7 @@ pub fn packets_from_csv(paths: Vec<&Path>) -> Result<Vec<model::Packet>, csv::Er
             }
 
             let flag = {
-                if let Some(flag) = fields.get((3 + dlc + 1) as usize) {
+                if let Some(flag) = fields.get((3 + dlc) as usize) {
                     flag != "Normal"
                 } else {
                     false
