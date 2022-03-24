@@ -201,23 +201,21 @@ pub fn normalize(
     params: &Option<Vec<(f64, f64)>>,
 ) -> Option<Vec<(f64, f64)>> {
     if dataset.records.is_empty() {
-        None    
-    } else {
-        if let Some(params) = params {
-            for (i, mut col) in dataset.records.columns_mut().into_iter().enumerate() {
-                col.mapv_inplace(|v| (v - params[i].0) / (params[i].1 - params[i].0));
-            }
-            None
-        } else {
-            let mut params = Vec::new();
-            for col in dataset.records.columns() {
-                params.push((*col.min().unwrap(), *col.max().unwrap()));
-            }
-            for (i, mut col) in dataset.records.columns_mut().into_iter().enumerate() {
-                col.mapv_inplace(|v| (v - params[i].0) / (params[i].1 - params[i].0));
-            }
-            Some(params)
+        None
+    } else if let Some(params) = params {
+        for (i, mut col) in dataset.records.columns_mut().into_iter().enumerate() {
+            col.mapv_inplace(|v| (v - params[i].0) / (params[i].1 - params[i].0));
         }
+        None
+    } else {
+        let mut params = Vec::new();
+        for col in dataset.records.columns() {
+            params.push((*col.min().unwrap(), *col.max().unwrap()));
+        }
+        for (i, mut col) in dataset.records.columns_mut().into_iter().enumerate() {
+            col.mapv_inplace(|v| (v - params[i].0) / (params[i].1 - params[i].0));
+        }
+        Some(params)
     }
 }
 
@@ -227,22 +225,20 @@ pub fn normalize_unsupervised(
 ) -> Option<Vec<(f64, f64)>> {
     if dataset.records.is_empty() {
         None
-    } else {
-        if let Some(params) = params {
-            for (i, mut col) in dataset.records.columns_mut().into_iter().enumerate() {
-                col.mapv_inplace(|v| (v - params[i].0) / (params[i].1 - params[i].0));
-            }
-            None
-        } else {
-            let mut params = Vec::new();
-            for col in dataset.records.columns() {
-                params.push((*col.min().unwrap(), *col.max().unwrap()));
-            }
-            for (i, mut col) in dataset.records.columns_mut().into_iter().enumerate() {
-                col.mapv_inplace(|v| (v - params[i].0) / (params[i].1 - params[i].0));
-            }
-            Some(params)
+    } else if let Some(params) = params {
+        for (i, mut col) in dataset.records.columns_mut().into_iter().enumerate() {
+            col.mapv_inplace(|v| (v - params[i].0) / (params[i].1 - params[i].0));
         }
+        None
+    } else {
+        let mut params = Vec::new();
+        for col in dataset.records.columns() {
+            params.push((*col.min().unwrap(), *col.max().unwrap()));
+        }
+        for (i, mut col) in dataset.records.columns_mut().into_iter().enumerate() {
+            col.mapv_inplace(|v| (v - params[i].0) / (params[i].1 - params[i].0));
+        }
+        Some(params)
     }
 }
 

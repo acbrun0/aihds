@@ -211,16 +211,16 @@ async fn main() -> Result<(), Error> {
                                         frame.data().to_vec(),
                                         false,
                                     ));
-                                } else {
-                                    baseline.push(Packet::new(
-                                        Utc::now().naive_local().timestamp_nanos(),
-                                        frame.id().to_string(),
-                                        frame.data().to_vec(),
-                                        false,
-                                    ));
                                 }
+                            } else {
+                                baseline.push(Packet::new(
+                                    Utc::now().naive_local().timestamp_nanos(),
+                                    frame.id().to_string(),
+                                    frame.data().to_vec(),
+                                    false,
+                                ));
                             }
-                            
+
                             if baseline.len() as f32 % (BASELINE_SIZE as f32 * 0.05) == 0.0 {
                                 print!(
                                     "{:.0}%\r",
@@ -360,8 +360,13 @@ async fn main() -> Result<(), Error> {
                         match dataset::packets_from_csv(test_paths) {
                             Ok(packets) => {
                                 let client = reqwest::Client::new();
-                                let mut ids =
-                                    Ids::new(Some(model), scaler, WINDOW_SIZE, WINDOW_SLIDE, monitor);
+                                let mut ids = Ids::new(
+                                    Some(model),
+                                    scaler,
+                                    WINDOW_SIZE,
+                                    WINDOW_SLIDE,
+                                    monitor,
+                                );
                                 for packet in packets {
                                     if let Some(result) = ids.push(packet) {
                                         match server::post(
