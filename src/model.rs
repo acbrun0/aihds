@@ -4,6 +4,8 @@ use linfa_svm::Svm;
 use ndarray::{Array1, Array2};
 use std::{collections::HashMap, fs, path::Path, io::Write};
 
+pub type Features = [f64; 3];
+
 pub struct Packet {
     timestamp: i64,
     id: u32,
@@ -50,7 +52,7 @@ impl Ids {
     }
 
     pub fn train(&mut self, packets: Vec<Packet>) {
-        let mut features: Vec<[f64; 3]> = Vec::new();
+        let mut features: Vec<Features> = Vec::new();
         let mut labels = Vec::new();
         for packet in packets {
             if self.window.len() < self.window.capacity() {
@@ -67,7 +69,7 @@ impl Ids {
                     self.window.push(packet);
                     self.counter += 1;
                     if self.counter == self.slide {
-                        let mut feat: [f64; 3] = [0.0, 0.0, 0.0];
+                        let mut feat: Features = [0.0, 0.0, 0.0];
                         for (i, f) in self.extract_features().iter().enumerate() {
                             feat[i] = *f;
                         }
@@ -81,7 +83,7 @@ impl Ids {
                 self.window.push(packet);
                 self.counter += 1;
                 if self.counter == self.slide {
-                    let mut feat: [f64; 3] = [0.0, 0.0, 0.0];
+                    let mut feat: Features = [0.0, 0.0, 0.0];
                     for (i, f) in self.extract_features().iter().enumerate() {
                         feat[i] = *f;
                     }
@@ -120,7 +122,7 @@ impl Ids {
         }
     }
 
-    pub fn test(&mut self, packets: Vec<Packet>) -> (Vec<bool>, Vec<([f64; 3], bool)>) {
+    pub fn test(&mut self, packets: Vec<Packet>) -> (Vec<bool>, Vec<(Features, bool)>) {
         let mut predictions = Vec::new();
         let mut real = Vec::new();
         let mut features = Vec::new();
@@ -149,8 +151,8 @@ impl Ids {
         (real, predictions)
     }
 
-    pub fn push(&mut self, packet: Packet) -> Option<([f64; 3], bool)> {
-        let mut prediction: Option<([f64; 3], bool)> = None;
+    pub fn push(&mut self, packet: Packet) -> Option<(Features, bool)> {
+        let mut prediction: Option<(Features, bool)> = None;
 
         if self.window.len() < self.window.capacity() {
             self.window.push(packet);
@@ -167,11 +169,11 @@ impl Ids {
         prediction
     }
 
-    fn predict(&self) -> ([f64; 3], bool) {
+    fn predict(&self) -> (Features, bool) {
         if let Some(scaler) = &self.scaler {
             if let Some(model) = &self.model {
                 let mut si = 0;
-                let features: [f64; 3] = self
+                let features: Features = self
                     .extract_features()
                     .iter()
                     .map(|f| {
@@ -187,7 +189,7 @@ impl Ids {
         }
     }
 
-    fn extract_features(&self) -> [f64; 3] {
+    fn extract_features(&self) -> Features {
         let mut feat = HashMap::new();
         let mut ts = Vec::new();
         let mut avg_time = Vec::new();

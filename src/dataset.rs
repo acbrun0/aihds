@@ -104,7 +104,7 @@ pub fn write_features_unsupervised(
 //  - General entropy
 //  - Entropy between packets of the same ID;
 //  - Average Hamming distance between packets of the same ID
-fn extract_features(packets: &[Packet], monitor: &Option<Vec<String>>) -> [f64; 3] {
+fn extract_features(packets: &[Packet], monitor: &Option<Vec<String>>) -> model::Features {
     let mut feat = HashMap::new();
     let mut ts = Vec::new();
     let mut avg_time = Vec::new();
