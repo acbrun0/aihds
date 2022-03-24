@@ -43,7 +43,7 @@ struct Args {
     live: bool,
 }
 
-const BASELINE_SIZE: usize = 100000;
+const BASELINE_SIZE: usize = 10000;
 const WINDOW_SIZE: usize = 500;
 const WINDOW_SLIDE: u16 = 100;
 
@@ -204,7 +204,7 @@ async fn main() -> Result<(), Error> {
                     match socket.read_frame() {
                         Ok(frame) => {
                             if let Some(monitor) = &monitor {
-                                if monitor.contains(&frame.id().to_string()) {
+                                if monitor.contains(&format!("{:X}", &frame.id())) {
                                     baseline.push(Packet::new(
                                         Utc::now().naive_local().timestamp_nanos(),
                                         frame.id().to_string(),
@@ -221,7 +221,7 @@ async fn main() -> Result<(), Error> {
                                 ));
                             }
 
-                            if baseline.len() as f32 % (BASELINE_SIZE as f32 * 0.05) == 0.0 {
+                            if baseline.len() as f32 % (BASELINE_SIZE as f32 * 0.01) == 0.0 {
                                 print!(
                                     "{:.0}%\r",
                                     baseline.len() as f32 / BASELINE_SIZE as f32 * 100.0
