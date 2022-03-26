@@ -196,15 +196,29 @@ async fn main() -> Result<(), Error> {
     // } else
 
     if args.live {
-        let mut baseline: Vec<Packet> = Vec::with_capacity(BASELINE_SIZE);
-        match server::open_socket("can0") {
-            Ok(socket) => {
-                println!("Gathering baseline...");
-                while baseline.len() <= BASELINE_SIZE {
-                    match socket.read_frame() {
-                        Ok(frame) => {
-                            if let Some(monitor) = &monitor {
-                                if monitor.contains(&format!("{:X}", &frame.id())) {
+        let mut ids;
+        if let Some(modelpath) = args.model {
+            let model = svm::load(Path::new(&modelpath)).expect("Could not load model");
+            let scaler = bincode::deserialize(&fs::read("models/scaler").unwrap()).unwrap();
+            ids = Ids::new(Some(model), Some(scaler), WINDOW_SIZE, WINDOW_SLIDE, monitor);
+        } else {
+            let mut baseline: Vec<Packet> = Vec::with_capacity(BASELINE_SIZE);
+            match server::open_socket("can0") {
+                Ok(socket) => {
+                    println!("Gathering baseline...");
+                    while baseline.len() <= BASELINE_SIZE {
+                        match socket.read_frame() {
+                            Ok(frame) => {
+                                if let Some(monitor) = &monitor {
+                                    if monitor.contains(&format!("{:X}", &frame.id())) {
+                                        baseline.push(Packet::new(
+                                            Utc::now().naive_local().timestamp_nanos(),
+                                            frame.id().to_string(),
+                                            frame.data().to_vec(),
+                                            false,
+                                        ));
+                                    }
+                                } else {
                                     baseline.push(Packet::new(
                                         Utc::now().naive_local().timestamp_nanos(),
                                         frame.id().to_string(),
@@ -212,30 +226,28 @@ async fn main() -> Result<(), Error> {
                                         false,
                                     ));
                                 }
-                            } else {
-                                baseline.push(Packet::new(
-                                    Utc::now().naive_local().timestamp_nanos(),
-                                    frame.id().to_string(),
-                                    frame.data().to_vec(),
-                                    false,
-                                ));
+    
+                                if baseline.len() as f32 % (BASELINE_SIZE as f32 * 0.01) == 0.0 {
+                                    print!(
+                                        "{:.0}%\r",
+                                        baseline.len() as f32 / BASELINE_SIZE as f32 * 100.0
+                                    );
+                                    io::stdout().flush().unwrap();
+                                }
                             }
-
-                            if baseline.len() as f32 % (BASELINE_SIZE as f32 * 0.01) == 0.0 {
-                                print!(
-                                    "{:.0}%\r",
-                                    baseline.len() as f32 / BASELINE_SIZE as f32 * 100.0
-                                );
-                                io::stdout().flush().unwrap();
-                            }
+                            Err(why) => panic!("Could not read frame: {}", why),
                         }
-                        Err(why) => panic!("Could not read frame: {}", why),
                     }
+                    ids = Ids::new(None, None, WINDOW_SIZE, WINDOW_SLIDE, monitor);
+                    println!("Training model...");
+                    ids.train(baseline);
+                    println!("Training complete");
                 }
-                let mut ids = Ids::new(None, None, WINDOW_SIZE, WINDOW_SLIDE, monitor);
-                println!("Training model...");
-                ids.train(baseline);
-                println!("Training complete");
+                Err(why) => panic!("Could not open socket: {}", why)
+            }
+        }
+        match server::open_socket("can0") {
+            Ok(socket) => {
                 println!("Analysing network...");
                 loop {
                     match socket.read_frame() {
@@ -247,7 +259,7 @@ async fn main() -> Result<(), Error> {
                                 false,
                             )) {
                                 if !result.1 {
-                                    println!("{:?}", result);
+                                    println!("Attack detected");
                                 }
                             }
                         }
@@ -255,7 +267,7 @@ async fn main() -> Result<(), Error> {
                     }
                 }
             }
-            Err(why) => panic!("Could not open socket: {}", why),
+            Err(why) => panic!("Could not open socket: {}", why)
         }
     } else if args.model.is_none() {
         if let Some(url) = args.streaming {
