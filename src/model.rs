@@ -56,28 +56,7 @@ impl Ids {
         let mut labels = Vec::new();
         for packet in packets {
             if self.window.len() < self.window.capacity() {
-                if let Some(monitor) = &self.monitor {
-                    if monitor.contains(&packet.id) {
-                        self.window.push(packet)
-                    }
-                } else {
-                    self.window.push(packet);
-                }
-            } else if let Some(monitor) = &self.monitor {
-                if monitor.contains(&packet.id) {
-                    self.window.remove(0);
-                    self.window.push(packet);
-                    self.counter += 1;
-                    if self.counter == self.slide {
-                        let mut feat: Features = [0.0, 0.0, 0.0];
-                        for (i, f) in self.extract_features().iter().enumerate() {
-                            feat[i] = *f;
-                        }
-                        features.push(feat);
-                        labels.push(());
-                        self.counter = 0;
-                    }
-                }
+                self.window.push(packet);
             } else {
                 self.window.remove(0);
                 self.window.push(packet);
