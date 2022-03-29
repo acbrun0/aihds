@@ -54,6 +54,7 @@ impl Ids {
     pub fn train(&mut self, packets: Vec<Packet>) {
         let mut features: Vec<Features> = Vec::new();
         let mut labels = Vec::new();
+
         for packet in packets {
             if self.window.len() < self.window.capacity() {
                 self.window.push(packet);
@@ -78,6 +79,8 @@ impl Ids {
         let mut dataset = Dataset::new(Array2::from(features), Array1::from(labels))
             .with_feature_names(vec!["AvgTime", "Entropy", "HammingDist"]);
         self.scaler = dataset::normalize_unsupervised(&mut dataset, &None);
+
+        println!("Training with {} features", dataset.records.nsamples());
 
         match Svm::<f64, _>::params()
             .gaussian_kernel(10.0)

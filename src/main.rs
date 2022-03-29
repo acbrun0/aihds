@@ -43,14 +43,13 @@ struct Args {
     live: bool,
 }
 
-const BASELINE_SIZE: usize = 100000;
 const WINDOW_SIZE: usize = 500;
 const WINDOW_SLIDE: u16 = 250;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     let args = Args::parse();
-    let monitor = args.monitor.map(|monitor| {
+    let monitor: Option<Vec<String>> = args.monitor.map(|monitor| {
         monitor
             .split(',')
             .collect::<Vec<&str>>()
@@ -58,6 +57,13 @@ async fn main() -> Result<(), Error> {
             .map(|s| String::from(*s))
             .collect()
     });
+
+    let baseline_size: usize = 10000
+        * if monitor.is_some() {
+            monitor.clone().unwrap().len()
+        } else {
+            1
+        };
 
     if args.extract_features {
         match std::fs::create_dir_all(Path::new("features")) {
@@ -200,13 +206,19 @@ async fn main() -> Result<(), Error> {
         if let Some(modelpath) = args.model {
             let model = svm::load(Path::new(&modelpath)).expect("Could not load model");
             let scaler = bincode::deserialize(&fs::read("models/scaler").unwrap()).unwrap();
-            ids = Ids::new(Some(model), Some(scaler), WINDOW_SIZE, WINDOW_SLIDE, monitor);
+            ids = Ids::new(
+                Some(model),
+                Some(scaler),
+                WINDOW_SIZE,
+                WINDOW_SLIDE,
+                monitor,
+            );
         } else {
-            let mut baseline: Vec<Packet> = Vec::with_capacity(BASELINE_SIZE);
+            let mut baseline: Vec<Packet> = Vec::with_capacity(baseline_size);
             match server::open_socket("can0") {
                 Ok(socket) => {
                     println!("Gathering baseline...");
-                    while baseline.len() <= BASELINE_SIZE {
+                    while baseline.len() <= baseline_size {
                         match socket.read_frame() {
                             Ok(frame) => {
                                 if let Some(monitor) = &monitor {
@@ -226,11 +238,11 @@ async fn main() -> Result<(), Error> {
                                         false,
                                     ));
                                 }
-    
-                                if baseline.len() as f32 % (BASELINE_SIZE as f32 * 0.01) == 0.0 {
+
+                                if baseline.len() as f32 % (baseline_size as f32 * 0.01) == 0.0 {
                                     print!(
                                         "{:.0}%\r",
-                                        baseline.len() as f32 / BASELINE_SIZE as f32 * 100.0
+                                        baseline.len() as f32 / baseline_size as f32 * 100.0
                                     );
                                     io::stdout().flush().unwrap();
                                 }
@@ -243,7 +255,7 @@ async fn main() -> Result<(), Error> {
                     ids.train(baseline);
                     println!("Training complete");
                 }
-                Err(why) => panic!("Could not open socket: {}", why)
+                Err(why) => panic!("Could not open socket: {}", why),
             }
         }
         match server::open_socket("can0") {
@@ -282,7 +294,7 @@ async fn main() -> Result<(), Error> {
                     }
                 }
             }
-            Err(why) => panic!("Could not open socket: {}", why)
+            Err(why) => panic!("Could not open socket: {}", why),
         }
     } else if args.model.is_none() {
         if let Some(url) = args.streaming {
