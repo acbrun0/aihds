@@ -43,9 +43,9 @@ struct Args {
     live: bool,
 }
 
-const BASELINE_SIZE: usize = 10000;
+const BASELINE_SIZE: usize = 100000;
 const WINDOW_SIZE: usize = 500;
-const WINDOW_SLIDE: u16 = 100;
+const WINDOW_SLIDE: u16 = 250;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -248,6 +248,8 @@ async fn main() -> Result<(), Error> {
         }
         match server::open_socket("can0") {
             Ok(socket) => {
+                let client = reqwest::Client::new();
+                let url = args.streaming.unwrap();
                 println!("Analysing network...");
                 loop {
                     match socket.read_frame() {
@@ -258,8 +260,21 @@ async fn main() -> Result<(), Error> {
                                 frame.data().to_vec(),
                                 false,
                             )) {
-                                if !result.1 {
-                                    println!("Attack detected");
+                                match server::post(
+                                    &client,
+                                    &url,
+                                    result.0.iter().map(|f| *f as f32).collect(),
+                                    &result.1,
+                                )
+                                .await
+                                {
+                                    Ok(_) => (),
+                                    Err(why) => {
+                                        println!(
+                                            "Could not communicate with server: {}",
+                                            why
+                                        )
+                                    }
                                 }
                             }
                         }

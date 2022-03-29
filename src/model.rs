@@ -2,7 +2,7 @@ use crate::dataset;
 use linfa::prelude::*;
 use linfa_svm::Svm;
 use ndarray::{Array1, Array2};
-use std::{collections::HashMap, fs, io::Write, path::Path};
+use std::{collections::HashMap, fs, path::Path};
 
 pub type Features = [f64; 3];
 
@@ -62,13 +62,15 @@ impl Ids {
                 self.window.push(packet);
                 self.counter += 1;
                 if self.counter == self.slide {
-                    let mut feat: Features = [0.0, 0.0, 0.0];
-                    for (i, f) in self.extract_features().iter().enumerate() {
-                        feat[i] = *f;
+                    if let Some(extracted) = self.extract_features() {
+                        let mut feat: Features = [0.0, 0.0, 0.0];
+                        for (i, f) in extracted.iter().enumerate() {
+                            feat[i] = *f;
+                        }
+                        features.push(feat);
+                        labels.push(());
+                        self.counter = 0;
                     }
-                    features.push(feat);
-                    labels.push(());
-                    self.counter = 0;
                 }
             }
         }
@@ -78,8 +80,9 @@ impl Ids {
         self.scaler = dataset::normalize_unsupervised(&mut dataset, &None);
 
         match Svm::<f64, _>::params()
-            .gaussian_kernel(5.0)
-            .nu_weight(0.001)
+            .gaussian_kernel(10.0)
+            // .polynomial_kernel(0.0, 3.0)
+            .nu_weight(0.01)
             .fit(&dataset)
         {
             Ok(model) => {
@@ -107,22 +110,12 @@ impl Ids {
         let mut predictions = Vec::new();
         let mut real = Vec::new();
         let mut features = Vec::new();
-        match fs::File::create(Path::new("models/test.txt")) {
-            Ok(mut file) => {
-                for packet in packets {
-                    if let Some(result) = self.push(packet) {
-                        match file.write_all(format!("{:?} -> {}\n", result.0, result.1).as_bytes())
-                        {
-                            Ok(_) => (),
-                            Err(why) => panic!("Could not write log: {}", why),
-                        }
-                        features.push(result.0);
-                        predictions.push(result);
-                        real.push(self.window.iter().any(|p| p.flag));
-                    }
-                }
+        for packet in packets {
+            if let Some(result) = self.push(packet) {
+                features.push(result.0);
+                predictions.push(result);
+                real.push(self.window.iter().any(|p| p.flag));
             }
-            Err(why) => panic!("Could not create log file: {}", why),
         }
 
         match dataset::write_features(
@@ -148,7 +141,7 @@ impl Ids {
             self.window.push(packet);
             self.counter += 1;
             if self.counter == self.slide {
-                prediction = Some(self.predict());
+                prediction = self.predict();
                 self.counter = 0;
             }
         }
@@ -156,13 +149,12 @@ impl Ids {
         prediction
     }
 
-    fn predict(&self) -> (Features, bool) {
+    fn predict(&self) -> Option<(Features, bool)> {
         if let Some(scaler) = &self.scaler {
             if let Some(model) = &self.model {
                 let mut si = 0;
-                let features: Features = self
-                    .extract_features()
-                    .iter()
+                if let Some(features) = self.extract_features() {
+                    let features = features.iter()
                     .map(|f| {
                         si += 1;
                         (f - scaler[si - 1].0) / (scaler[si - 1].1 - scaler[si - 1].0)
@@ -171,7 +163,10 @@ impl Ids {
                     .as_slice()
                     .try_into()
                     .unwrap();
-                (features, model.predict(Array1::from(features.to_vec())))
+                    return Some((features, model.predict(Array1::from(features.to_vec()))))
+                } else {
+                    return None
+                }
             } else {
                 panic!("IDS does not have a model.");
             }
@@ -180,7 +175,7 @@ impl Ids {
         }
     }
 
-    fn extract_features(&self) -> Features {
+    fn extract_features(&self) -> Option<Features> {
         let mut feat = HashMap::new();
         let mut ts = Vec::new();
         let mut avg_time = Vec::new();
@@ -267,16 +262,16 @@ impl Ids {
                 }
             }
 
-            [
+            Some([
                 // feat.len() as f64,
                 // ts.iter().sum::<f64>() / ts.len() as f64,
                 // general_entropy,
                 avg_time.iter().sum::<f64>() / avg_time.len() as f64,
                 entropy.iter().sum::<f64>() / entropy.len() as f64,
                 hamming.iter().sum::<f64>() / hamming.len() as f64,
-            ]
+            ])
         } else {
-            [0.0, 0.0, 0.0]
+            None
         }
     }
 }
