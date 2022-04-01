@@ -166,9 +166,9 @@ impl Ids {
                     .as_slice()
                     .try_into()
                     .unwrap();
-                    return Some((features, model.predict(Array1::from(features.to_vec()))))
+                    Some((features, model.predict(Array1::from(features.to_vec()))))
                 } else {
-                    return None
+                    None
                 }
             } else {
                 panic!("IDS does not have a model.");
