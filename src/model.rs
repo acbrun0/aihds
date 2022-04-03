@@ -2,7 +2,7 @@ use crate::dataset;
 use linfa::prelude::*;
 use linfa_svm::Svm;
 use ndarray::{Array1, Array2};
-use std::{collections::HashMap, fs, path::Path};
+use std::{collections::HashMap, fs, path::Path, time::Instant};
 
 pub type Features = [f64; 3];
 
@@ -80,12 +80,10 @@ impl Ids {
             .with_feature_names(vec!["AvgTime", "Entropy", "HammingDist"]);
         self.scaler = dataset::normalize_unsupervised(&mut dataset, &None);
 
-        println!("Training with {} features", dataset.records.nsamples());
-
         match Svm::<f64, _>::params()
             .gaussian_kernel(1.0)
             // .polynomial_kernel(0.0, 3.0)
-            .nu_weight(0.01)
+            .nu_weight(0.001)
             .fit(&dataset)
         {
             Ok(model) => {
@@ -110,10 +108,13 @@ impl Ids {
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn test(&mut self, packets: Vec<Packet>) -> (Vec<bool>, Vec<(Features, bool, (i64, i64))>) {
+    pub fn test(&mut self, packets: Vec<Packet>) -> (Vec<bool>, Vec<(Features, bool, (i64, i64))>, f32) {
         let mut predictions = Vec::new();
         let mut real = Vec::new();
         let mut features = Vec::new();
+        let n_packets = packets.len();
+
+        let start = Instant::now();
         for packet in packets {
             if let Some(result) = self.push(packet) {
                 features.push(result.0);
@@ -121,6 +122,7 @@ impl Ids {
                 real.push(self.window.iter().any(|p| p.flag));
             }
         }
+        let duration = start.elapsed().as_secs_f32();
 
         match dataset::write_features(
             Path::new("models/test.csv"),
@@ -132,7 +134,7 @@ impl Ids {
             Err(why) => println!("Could not save test features: {}", why),
         }
 
-        (real, predictions)
+        (real, predictions, n_packets as f32 / duration)
     }
 
     pub fn push(&mut self, packet: Packet) -> Option<(Features, bool, (i64, i64))> {
@@ -195,55 +197,37 @@ impl Ids {
 
     fn extract_features(&self) -> Option<Features> {
         let mut feat = HashMap::new();
-        let mut ts = Vec::new();
         let mut avg_time = Vec::new();
         let mut entropy = Vec::new();
         let mut hamming: Vec<f64> = Vec::new();
-        let mut _general_entropy = 0.0;
 
         if let Some(ids) = &self.monitor {
             for p in &self.window {
                 if ids.contains(&p.id) {
-                    ts.push(p.timestamp);
-                    let prob = self.window.iter().filter(|&x| x.data == p.data).count() as f64
-                        / self.window.len() as f64;
-                    _general_entropy += 0.0 - prob * prob.log2();
                     let stat = feat.entry(&p.id).or_insert((Vec::new(), Vec::new()));
                     stat.0.push(p.timestamp);
-                    stat.1.push(p.data.clone());
+                    stat.1.push(&p.data);
                 }
             }
         } else {
             for p in &self.window {
-                ts.push(p.timestamp);
-                let prob = self.window.iter().filter(|&x| x.data == p.data).count() as f64
-                    / self.window.len() as f64;
-                _general_entropy += 0.0 - prob * prob.log2();
                 let stat = feat.entry(&p.id).or_insert((Vec::new(), Vec::new()));
                 stat.0.push(p.timestamp);
-                stat.1.push(p.data.clone());
+                stat.1.push(&p.data);
             }
         }
 
         if !feat.is_empty() {
-            let mut interval = Vec::new();
-            if ts.len() > 1 {
-                interval = ts.windows(2).map(|w| w[1] - w[0]).collect::<Vec<i64>>();
-            }
-            if interval.is_empty() {
-                interval.push(0);
-            }
-
-            for (_, val) in feat.iter_mut() {
-                let mut id_interval = Vec::new();
+            for val in feat.values() {
+                let mut interval = Vec::new();
                 if val.0.len() > 1 {
-                    id_interval = val.0.windows(2).map(|w| w[1] - w[0]).collect::<Vec<i64>>();
+                    interval = val.0.windows(2).map(|w| w[1] - w[0]).collect::<Vec<i64>>();
                 } else {
-                    id_interval.push(0);
+                    interval.push(0);
                 }
 
                 avg_time.push(if !val.0.is_empty() {
-                    id_interval.iter().sum::<i64>() as f64 / val.0.len() as f64
+                    interval.iter().sum::<i64>() as f64 / val.0.len() as f64
                 } else {
                     0.0
                 });
@@ -265,8 +249,8 @@ impl Ids {
                             .windows(2)
                             .map(|b| {
                                 let mut count = 0;
-                                for (b1, b2) in b[0].iter().zip(b[1].clone()) {
-                                    if *b1 != b2 {
+                                for (b1, b2) in b[0].iter().zip(b[1]) {
+                                    if *b1 != *b2 {
                                         count += 1
                                     }
                                 }
@@ -281,9 +265,6 @@ impl Ids {
             }
 
             Some([
-                // feat.len() as f64,
-                // ts.iter().sum::<f64>() / ts.len() as f64,
-                // general_entropy,
                 avg_time.iter().sum::<f64>() / avg_time.len() as f64,
                 entropy.iter().sum::<f64>() / entropy.len() as f64,
                 hamming.iter().sum::<f64>() / hamming.len() as f64,

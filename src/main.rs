@@ -43,8 +43,8 @@ struct Args {
     live: bool,
 }
 
-const WINDOW_SIZE: usize = 200;
-const WINDOW_SLIDE: u16 = 50;
+const WINDOW_SIZE: usize = 2000;
+const WINDOW_SLIDE: u16 = 2000;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -367,7 +367,7 @@ async fn main() -> Result<(), Error> {
                         let test_paths: Vec<&Path> = test_paths.iter().map(Path::new).collect();
                         match dataset::packets_from_csv(test_paths) {
                             Ok(packets) => {
-                                let (real, pred) = ids.test(packets);
+                                let (real, pred, speed) = ids.test(packets);
                                 let pred: Vec<bool> = pred.into_iter().map(|p| p.1).collect();
                                 let mut tp = 0;
                                 let mut fp = 0;
@@ -387,6 +387,7 @@ async fn main() -> Result<(), Error> {
                                     }
                                 }
                                 println!("True positives: {}\nTrue negatives: {}\nFalse positives: {}\nFalse negatives: {}", tp, tn, fp, fal_n);
+                                println!("Average packets/s: {}", speed);
                             }
                             Err(why) => panic!("Could not load test datasets: {}", why),
                         }
@@ -405,8 +406,7 @@ async fn main() -> Result<(), Error> {
                     if let Some(paths) = args.test {
                         let test_paths: Vec<&str> = paths.split(',').collect();
                         let test_paths: Vec<&Path> = test_paths.iter().map(Path::new).collect();
-                        let scaler =
-                            bincode::deserialize(&fs::read("models/scaler").unwrap()).unwrap();
+                        let scaler = bincode::deserialize(&fs::read("models/scaler").unwrap()).unwrap();
                         match dataset::packets_from_csv(test_paths) {
                             Ok(packets) => {
                                 let client = reqwest::Client::new();
@@ -498,9 +498,9 @@ async fn main() -> Result<(), Error> {
                     let scaler = bincode::deserialize(&fs::read("models/scaler").unwrap()).unwrap();
                     match dataset::packets_from_csv(test_paths) {
                         Ok(packets) => {
-                            let (real, pred) = Ids::new(
+                            let (real, pred, speed) = Ids::new(
                                 Some(model),
-                                Some(scaler),
+                                scaler,
                                 WINDOW_SIZE,
                                 WINDOW_SLIDE,
                                 monitor,
@@ -525,6 +525,7 @@ async fn main() -> Result<(), Error> {
                                 }
                             }
                             println!("True positives: {}\nTrue negatives: {}\nFalse positives: {}\nFalse negatives: {}", tp, tn, fp, fal_n);
+                            println!("Average packets/s: {}", speed);
                         }
                         Err(why) => panic!("Could not load test datasets: {}", why),
                     }
