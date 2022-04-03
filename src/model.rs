@@ -83,7 +83,7 @@ impl Ids {
         println!("Training with {} features", dataset.records.nsamples());
 
         match Svm::<f64, _>::params()
-            .gaussian_kernel(10.0)
+            .gaussian_kernel(1.0)
             // .polynomial_kernel(0.0, 3.0)
             .nu_weight(0.01)
             .fit(&dataset)
@@ -109,7 +109,8 @@ impl Ids {
         }
     }
 
-    pub fn test(&mut self, packets: Vec<Packet>) -> (Vec<bool>, Vec<(Features, bool)>) {
+    #[allow(clippy::type_complexity)]
+    pub fn test(&mut self, packets: Vec<Packet>) -> (Vec<bool>, Vec<(Features, bool, (i64, i64))>) {
         let mut predictions = Vec::new();
         let mut real = Vec::new();
         let mut features = Vec::new();
@@ -134,8 +135,8 @@ impl Ids {
         (real, predictions)
     }
 
-    pub fn push(&mut self, packet: Packet) -> Option<(Features, bool)> {
-        let mut prediction: Option<(Features, bool)> = None;
+    pub fn push(&mut self, packet: Packet) -> Option<(Features, bool, (i64, i64))> {
+        let mut prediction: Option<(Features, bool, (i64, i64))> = None;
 
         if self.window.len() < self.window.capacity() {
             self.window.push(packet);
@@ -144,7 +145,18 @@ impl Ids {
             self.window.push(packet);
             self.counter += 1;
             if self.counter == self.slide {
-                prediction = self.predict();
+                prediction = if let Some(pred) = self.predict() {
+                    Some((
+                        pred.0,
+                        pred.1,
+                        (
+                            self.window[0].timestamp,
+                            self.window[self.window.capacity() - 1].timestamp,
+                        ),
+                    ))
+                } else {
+                    None
+                };
                 self.counter = 0;
             }
         }
@@ -157,16 +169,19 @@ impl Ids {
             if let Some(model) = &self.model {
                 let mut si = 0;
                 if let Some(features) = self.extract_features() {
-                    let features = features.iter()
-                    .map(|f| {
-                        si += 1;
-                        (f - scaler[si - 1].0) / (scaler[si - 1].1 - scaler[si - 1].0)
-                    })
-                    .collect::<Vec<f64>>()
-                    .as_slice()
-                    .try_into()
-                    .unwrap();
-                    Some((features, model.predict(Array1::from(features.to_vec()))))
+                    let features = features
+                        .iter()
+                        .map(|f| {
+                            si += 1;
+                            (f - scaler[si - 1].0) / (scaler[si - 1].1 - scaler[si - 1].0)
+                        })
+                        .collect::<Vec<f64>>()
+                        .as_slice()
+                        .try_into()
+                        .unwrap();
+                    // Positive class is normal
+                    // Negative class is anomaly
+                    Some((features, !model.predict(Array1::from(features.to_vec()))))
                 } else {
                     None
                 }

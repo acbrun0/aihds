@@ -18,3 +18,10 @@ a {
   display: block;
   opacity: 0.5;
 }
+
+.log {
+  width: 50%;
+  height: 200px;
+  overflow: auto;
+  white-space: pre-line;
+}

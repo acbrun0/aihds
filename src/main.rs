@@ -6,7 +6,7 @@ use chrono::Utc;
 use clap::Parser;
 use linfa::prelude::*;
 use model::{svm, Ids, Packet};
-use std::{fs, io, io::Write, path::Path};
+use std::{fs, io, io::Write, path::Path, thread, time};
 
 #[derive(Parser)]
 #[clap(author, version, about)]
@@ -43,8 +43,8 @@ struct Args {
     live: bool,
 }
 
-const WINDOW_SIZE: usize = 500;
-const WINDOW_SLIDE: u16 = 250;
+const WINDOW_SIZE: usize = 200;
+const WINDOW_SLIDE: u16 = 50;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -277,15 +277,18 @@ async fn main() -> Result<(), Error> {
                                     &url,
                                     result.0.iter().map(|f| *f as f32).collect(),
                                     &result.1,
+                                    if result.1 {
+                                        Some(format!(
+                                            "Found attack inside window [{}, {}]",
+                                            result.2 .0, result.2 .1
+                                        ))
+                                    } else { None },
                                 )
                                 .await
                                 {
                                     Ok(_) => (),
                                     Err(why) => {
-                                        println!(
-                                            "Could not communicate with server: {}",
-                                            why
-                                        )
+                                        println!("Could not communicate with server: {}", why)
                                     }
                                 }
                             }
@@ -313,6 +316,8 @@ async fn main() -> Result<(), Error> {
                                     let client = reqwest::Client::new();
                                     for packet in packets {
                                         if let Some(result) = ids.push(packet) {
+                                            // Sleep to allow chart animation to complete
+                                            thread::sleep(time::Duration::from_millis(50));
                                             match server::post(
                                                 &client,
                                                 &url,
@@ -323,6 +328,12 @@ async fn main() -> Result<(), Error> {
                                                     .map(|v| *v as f32)
                                                     .collect(),
                                                 &result.1,
+                                                if result.1 {
+                                                    Some(format!(
+                                                        "Found attack inside window [{}, {}]",
+                                                        result.2 .0, result.2 .1
+                                                    ))
+                                                } else { None },
                                             )
                                             .await
                                             {
@@ -413,6 +424,12 @@ async fn main() -> Result<(), Error> {
                                             &url,
                                             result.0.to_vec().iter().map(|v| *v as f32).collect(),
                                             &result.1,
+                                            if result.1 {
+                                                Some(format!(
+                                                    "Found attack inside window [{}, {}]",
+                                                    result.2 .0, result.2 .1
+                                                ))
+                                            } else { None },
                                         )
                                         .await
                                         {
@@ -449,6 +466,12 @@ async fn main() -> Result<(), Error> {
                                                     &url,
                                                     result.0.iter().map(|f| *f as f32).collect(),
                                                     &result.1,
+                                                    if result.1 {
+                                                        Some(format!(
+                                                            "Found attack inside window [{}, {}]",
+                                                            result.2 .0, result.2 .1
+                                                        ))
+                                                    } else { None },
                                                 )
                                                 .await
                                                 {

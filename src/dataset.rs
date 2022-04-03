@@ -363,7 +363,10 @@ pub fn packets_from_csv(paths: Vec<&Path>) -> Result<Vec<model::Packet>, csv::Er
 
             let mut bytes = [0; 8];
             for (i, item) in bytes.iter_mut().enumerate().take(dlc as usize) {
-                *item = u8::from_str_radix(fields.get(i + 3).unwrap(), 16).unwrap();
+                *item = match u8::from_str_radix(fields.get(i + 3).unwrap(), 16) {
+                    Ok(digit) => digit,
+                    Err(why) => panic!("Could not parse {}: {}", fields.get(i + 3).unwrap(), why),
+                }
             }
 
             let flag = {
