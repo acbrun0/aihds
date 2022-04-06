@@ -58,7 +58,7 @@ async fn main() -> Result<(), Error> {
             .collect()
     });
 
-    let baseline_size: usize = 10000
+    let baseline_size: usize = 100000
         * if monitor.is_some() {
             monitor.clone().unwrap().len()
         } else {
@@ -215,12 +215,16 @@ async fn main() -> Result<(), Error> {
                     while baseline.len() <= baseline_size {
                         match socket.read_frame() {
                             Ok(frame) => {
+                                let mut data = frame.data().to_vec();
+                                while data.len() < 8 {
+                                    data.push(0);
+                                }
                                 if let Some(monitor) = &monitor {
                                     if monitor.contains(&format!("{:X}", &frame.id())) {
                                         baseline.push(Packet::new(
                                             Utc::now().naive_local().timestamp_millis(),
                                             frame.id().to_string(),
-                                            frame.data().to_vec(),
+                                            data,
                                             false,
                                         ));
                                     }
@@ -228,7 +232,7 @@ async fn main() -> Result<(), Error> {
                                     baseline.push(Packet::new(
                                         Utc::now().naive_local().timestamp_millis(),
                                         frame.id().to_string(),
-                                        frame.data().to_vec(),
+                                        data,
                                         false,
                                     ));
                                 }
@@ -259,10 +263,14 @@ async fn main() -> Result<(), Error> {
                 loop {
                     match socket.read_frame() {
                         Ok(frame) => {
+                            let mut data = frame.data().to_vec();
+                            while data.len() < 8 {
+                                data.push(0);
+                            }
                             if let Some(result) = ids.push(Packet::new(
                                 Utc::now().naive_local().timestamp_millis(),
                                 frame.id().to_string(),
-                                frame.data().to_vec(),
+                                data,
                                 false,
                             )) {
                                 if let Some(url) = &args.streaming {
