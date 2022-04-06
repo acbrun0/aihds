@@ -143,8 +143,11 @@ impl Ids {
         (real, predictions, n_packets as f32 / duration)
     }
 
-    pub fn push(&mut self, packet: Packet) -> Option<(Features, bool, (i64, i64))> {
+    pub fn push(&mut self, mut packet: Packet) -> Option<(Features, bool, (i64, i64))> {
         let mut prediction: Option<(Features, bool, (i64, i64))> = None;
+        while packet.data.len() < 8 {
+            packet.data.push(0);
+        }
         if self.window.len() < self.window.capacity() {
             self.window.push(packet);
         } else {

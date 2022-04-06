@@ -206,13 +206,7 @@ async fn main() -> Result<(), Error> {
         if let Some(modelpath) = args.model {
             let model = svm::load(Path::new(&modelpath)).expect("Could not load model");
             let scaler = bincode::deserialize(&fs::read("models/scaler").unwrap()).unwrap();
-            ids = Ids::new(
-                Some(model),
-                scaler,
-                WINDOW_SIZE,
-                WINDOW_SLIDE,
-                monitor,
-            );
+            ids = Ids::new(Some(model), scaler, WINDOW_SIZE, WINDOW_SLIDE, monitor);
         } else {
             let mut baseline: Vec<Packet> = Vec::with_capacity(baseline_size);
             match server::open_socket("can0") {
