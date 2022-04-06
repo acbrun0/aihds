@@ -208,7 +208,7 @@ async fn main() -> Result<(), Error> {
             let scaler = bincode::deserialize(&fs::read("models/scaler").unwrap()).unwrap();
             ids = Ids::new(
                 Some(model),
-                Some(scaler),
+                scaler,
                 WINDOW_SIZE,
                 WINDOW_SLIDE,
                 monitor,
@@ -460,7 +460,7 @@ async fn main() -> Result<(), Error> {
                                 let scaler =
                                     bincode::deserialize(&fs::read("models/scaler").unwrap())
                                         .unwrap();
-                                let mut ids = Ids::new(Some(model), Some(scaler), 200, 50, monitor);
+                                let mut ids = Ids::new(Some(model), scaler, 200, 50, monitor);
                                 loop {
                                     match socket.read_frame() {
                                         Ok(frame) => {
