@@ -6,6 +6,7 @@ use std::{collections::HashMap, fs, path::Path, time::Instant};
 
 pub type Features = [f64; 3];
 
+#[derive(Debug)]
 pub struct Packet {
     timestamp: i64,
     id: String,
@@ -87,6 +88,8 @@ impl Ids {
             .fit(&dataset)
         {
             Ok(model) => {
+                self.window.clear();
+                self.counter = 0;
                 match std::fs::create_dir_all(Path::new("models")) {
                     Ok(_) => {
                         dataset::write_features_unsupervised(
@@ -108,7 +111,10 @@ impl Ids {
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn test(&mut self, packets: Vec<Packet>) -> (Vec<bool>, Vec<(Features, bool, (i64, i64))>, f32) {
+    pub fn test(
+        &mut self,
+        packets: Vec<Packet>,
+    ) -> (Vec<bool>, Vec<(Features, bool, (i64, i64))>, f32) {
         let mut predictions = Vec::new();
         let mut real = Vec::new();
         let mut features = Vec::new();
@@ -139,7 +145,6 @@ impl Ids {
 
     pub fn push(&mut self, packet: Packet) -> Option<(Features, bool, (i64, i64))> {
         let mut prediction: Option<(Features, bool, (i64, i64))> = None;
-
         if self.window.len() < self.window.capacity() {
             self.window.push(packet);
         } else {
@@ -171,7 +176,7 @@ impl Ids {
             if let Some(model) = &self.model {
                 let mut si = 0;
                 if let Some(features) = self.extract_features() {
-                    let features = features
+                    let features: Features = features
                         .iter()
                         .map(|f| {
                             si += 1;
@@ -204,46 +209,36 @@ impl Ids {
         if let Some(ids) = &self.monitor {
             for p in &self.window {
                 if ids.contains(&p.id) {
-                    let stat = feat.entry(&p.id).or_insert((Vec::new(), Vec::new()));
-                    stat.0.push(p.timestamp);
-                    stat.1.push(&p.data);
+                    let val = feat.entry(&p.id).or_insert((Vec::new(), Vec::new()));
+                    val.0.push(p.timestamp);
+                    val.1.push(&p.data);
                 }
             }
         } else {
             for p in &self.window {
-                let stat = feat.entry(&p.id).or_insert((Vec::new(), Vec::new()));
-                stat.0.push(p.timestamp);
-                stat.1.push(&p.data);
+                let val = feat.entry(&p.id).or_insert((Vec::new(), Vec::new()));
+                val.0.push(p.timestamp);
+                val.1.push(&p.data);
             }
         }
 
         if !feat.is_empty() {
             for val in feat.values() {
+                // Calculate average arriving interval
                 let mut interval = Vec::new();
                 if val.0.len() > 1 {
                     interval = val.0.windows(2).map(|w| w[1] - w[0]).collect::<Vec<i64>>();
                 } else {
                     interval.push(0);
                 }
-
                 avg_time.push(if !val.0.is_empty() {
                     interval.iter().sum::<i64>() as f64 / val.0.len() as f64
                 } else {
                     0.0
                 });
 
-                let n_packets = val.1.len();
-                let mut datamap = HashMap::new();
-                let mut probs = Vec::new();
-                for bytes in &val.1 {
-                    let entry = datamap.entry(bytes).or_insert(0);
-                    *entry += 1;
-                }
-                for count in datamap.values() {
-                    probs.push(*count as f64 / n_packets as f64);
-                }
-                entropy.push(0.0 - probs.iter().map(|p| p * p.log2()).sum::<f64>());
                 if val.1.len() > 1 {
+                    // Calculate average Hamming distance
                     hamming.push(
                         val.1
                             .windows(2)
@@ -259,8 +254,26 @@ impl Ids {
                             .collect::<Vec<u32>>()
                             .iter()
                             .sum::<u32>() as f64
-                            / (val.1.len() - 1) as f64,
+                            / (val.1.len()) as f64,
                     );
+                    // Calculate entropy
+                    for i in 0..8 {
+                        // Get ith byte from each ocurrence
+                        let byteset: Vec<u8> = val.1.iter().map(|bytes| bytes[i]).collect();
+                        // Count number of times each byte ocurrs
+                        let mut bytemap = HashMap::new();
+                        for byte in byteset.iter() {
+                            let entry = bytemap.entry(byte).or_insert(0);
+                            *entry += 1;
+                        }
+                        // Get each byte's probability of ocurring
+                        let mut byteprobs = Vec::new();
+                        for count in bytemap.values() {
+                            byteprobs.push(*count as f64 / byteset.len() as f64)
+                        }
+                        // Calculate ith position's entropy
+                        entropy.push(0.0 - byteprobs.iter().map(|p| p * p.log2()).sum::<f64>());
+                    }
                 }
             }
 
