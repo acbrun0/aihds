@@ -43,8 +43,8 @@ struct Args {
     live: bool,
 }
 
-const WINDOW_SIZE: usize = 2000;
-const WINDOW_SLIDE: u16 = 2000;
+const WINDOW_SIZE: usize = 1000;
+const WINDOW_SLIDE: u16 = 500;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -224,7 +224,7 @@ async fn main() -> Result<(), Error> {
                                 if let Some(monitor) = &monitor {
                                     if monitor.contains(&format!("{:X}", &frame.id())) {
                                         baseline.push(Packet::new(
-                                            Utc::now().naive_local().timestamp_nanos(),
+                                            Utc::now().naive_local().timestamp_millis(),
                                             frame.id().to_string(),
                                             frame.data().to_vec(),
                                             false,
@@ -232,7 +232,7 @@ async fn main() -> Result<(), Error> {
                                     }
                                 } else {
                                     baseline.push(Packet::new(
-                                        Utc::now().naive_local().timestamp_nanos(),
+                                        Utc::now().naive_local().timestamp_millis(),
                                         frame.id().to_string(),
                                         frame.data().to_vec(),
                                         false,
@@ -267,7 +267,7 @@ async fn main() -> Result<(), Error> {
                     match socket.read_frame() {
                         Ok(frame) => {
                             if let Some(result) = ids.push(Packet::new(
-                                Utc::now().naive_local().timestamp_nanos(),
+                                Utc::now().naive_local().timestamp_millis(),
                                 frame.id().to_string(),
                                 frame.data().to_vec(),
                                 false,
@@ -282,7 +282,9 @@ async fn main() -> Result<(), Error> {
                                             "Found attack inside window [{}, {}]",
                                             result.2 .0, result.2 .1
                                         ))
-                                    } else { None },
+                                    } else {
+                                        None
+                                    },
                                 )
                                 .await
                                 {
@@ -333,7 +335,9 @@ async fn main() -> Result<(), Error> {
                                                         "Found attack inside window [{}, {}]",
                                                         result.2 .0, result.2 .1
                                                     ))
-                                                } else { None },
+                                                } else {
+                                                    None
+                                                },
                                             )
                                             .await
                                             {
@@ -406,7 +410,8 @@ async fn main() -> Result<(), Error> {
                     if let Some(paths) = args.test {
                         let test_paths: Vec<&str> = paths.split(',').collect();
                         let test_paths: Vec<&Path> = test_paths.iter().map(Path::new).collect();
-                        let scaler = bincode::deserialize(&fs::read("models/scaler").unwrap()).unwrap();
+                        let scaler =
+                            bincode::deserialize(&fs::read("models/scaler").unwrap()).unwrap();
                         match dataset::packets_from_csv(test_paths) {
                             Ok(packets) => {
                                 let client = reqwest::Client::new();
@@ -429,7 +434,9 @@ async fn main() -> Result<(), Error> {
                                                     "Found attack inside window [{}, {}]",
                                                     result.2 .0, result.2 .1
                                                 ))
-                                            } else { None },
+                                            } else {
+                                                None
+                                            },
                                         )
                                         .await
                                         {
@@ -455,7 +462,7 @@ async fn main() -> Result<(), Error> {
                                     match socket.read_frame() {
                                         Ok(frame) => {
                                             if let Some(result) = ids.push(Packet::new(
-                                                Utc::now().naive_local().timestamp_nanos(),
+                                                Utc::now().naive_local().timestamp_millis(),
                                                 frame.id().to_string(),
                                                 frame.data().to_vec(),
                                                 false,
@@ -471,7 +478,9 @@ async fn main() -> Result<(), Error> {
                                                             "Found attack inside window [{}, {}]",
                                                             result.2 .0, result.2 .1
                                                         ))
-                                                    } else { None },
+                                                    } else {
+                                                        None
+                                                    },
                                                 )
                                                 .await
                                                 {
@@ -498,14 +507,9 @@ async fn main() -> Result<(), Error> {
                     let scaler = bincode::deserialize(&fs::read("models/scaler").unwrap()).unwrap();
                     match dataset::packets_from_csv(test_paths) {
                         Ok(packets) => {
-                            let (real, pred, speed) = Ids::new(
-                                Some(model),
-                                scaler,
-                                WINDOW_SIZE,
-                                WINDOW_SLIDE,
-                                monitor,
-                            )
-                            .test(packets);
+                            let (real, pred, speed) =
+                                Ids::new(Some(model), scaler, WINDOW_SIZE, WINDOW_SLIDE, monitor)
+                                    .test(packets);
                             let pred: Vec<bool> = pred.into_iter().map(|p| p.1).collect();
                             let mut tp = 0;
                             let mut fp = 0;
