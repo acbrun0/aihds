@@ -261,7 +261,6 @@ async fn main() -> Result<(), Error> {
         match server::open_socket("can0") {
             Ok(socket) => {
                 let client = reqwest::Client::new();
-                let url = args.streaming.unwrap();
                 println!("Analysing network...");
                 loop {
                     match socket.read_frame() {
@@ -272,26 +271,30 @@ async fn main() -> Result<(), Error> {
                                 frame.data().to_vec(),
                                 false,
                             )) {
-                                match server::post(
-                                    &client,
-                                    &url,
-                                    result.0.iter().map(|f| *f as f32).collect(),
-                                    &result.1,
-                                    if result.1 {
-                                        Some(format!(
-                                            "Found attack inside window [{}, {}]",
-                                            result.2 .0, result.2 .1
-                                        ))
-                                    } else {
-                                        None
-                                    },
-                                )
-                                .await
-                                {
-                                    Ok(_) => (),
-                                    Err(why) => {
-                                        println!("Could not communicate with server: {}", why)
+                                if let Some(url) = &args.streaming {
+                                    match server::post(
+                                        &client,
+                                        url,
+                                        result.0.iter().map(|f| *f as f32).collect(),
+                                        &result.1,
+                                        if result.1 {
+                                            Some(format!(
+                                                "Found attack inside window [{}, {}]",
+                                                result.2 .0, result.2 .1
+                                            ))
+                                        } else {
+                                            None
+                                        },
+                                    )
+                                    .await
+                                    {
+                                        Ok(_) => (),
+                                        Err(why) => {
+                                            println!("Could not communicate with server: {}", why)
+                                        }
                                     }
+                                } else if result.1 {
+                                    println!("Attack detected");
                                 }
                             }
                         }
