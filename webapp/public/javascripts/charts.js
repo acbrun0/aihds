@@ -53,6 +53,8 @@ function loadCharts() {
     }
 
     let chart = new Chart(document.getElementById('chart1').getContext('2d'), config)
+    let log = document.getElementById('log')
+    let alert = document.getElementById('alert')
 
     io('http://localhost:9001').on('new data', (data) => {
         if (chart.data.labels.length > WINDOW_SIZE) {
@@ -64,5 +66,13 @@ function loadCharts() {
         for (let i = 0; i < 3; i++)
             chart.data.datasets[i].data.push(data[0][i])
         chart.update()
+        
+        if (data[1])
+            alert.style.opacity = 1
+        else
+            alert.style.opacity = 0.5
+
+        if (data[2] != null)
+            log.innerHTML += data[2] + '\n'
     })
 }
