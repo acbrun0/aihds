@@ -330,6 +330,7 @@ pub fn load(
 pub fn packets_from_csv(paths: Vec<&Path>) -> Result<Vec<model::Packet>, csv::Error> {
     let mut packets = Vec::new();
     for path in paths {
+        println!("Loading packets from {}", path.display());
         for (i, record) in csv::ReaderBuilder::new()
             .has_headers(true)
             .flexible(true)
@@ -340,8 +341,8 @@ pub fn packets_from_csv(paths: Vec<&Path>) -> Result<Vec<model::Packet>, csv::Er
             let fields: StringRecord = record?;
 
             // Converts timestamp from seconds to nanoseconds
-            let timestamp = match fields.get(0).unwrap().replace('.', "").parse::<i64>() {
-                Ok(timestamp) => timestamp * 1000,
+            let timestamp = match fields.get(0).unwrap().parse::<f64>() {
+                Ok(timestamp) => (timestamp * 1000000_f64) as i64,
                 Err(why) => panic!(
                     "Could not parse {} to an integer: {}",
                     fields.get(0).unwrap(),
