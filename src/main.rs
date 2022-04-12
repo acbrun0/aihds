@@ -259,6 +259,7 @@ async fn main() -> Result<(), Error> {
         match server::open_socket("can0") {
             Ok(socket) => {
                 let client = reqwest::Client::new();
+                let mut last_attack = time::Instant::now();
                 println!("Analysing network...");
                 loop {
                     match socket.read_frame() {
@@ -296,7 +297,12 @@ async fn main() -> Result<(), Error> {
                                         }
                                     }
                                 } else if result.1 {
-                                    println!("Attack detected");
+                                    if time::Instant::now().duration_since(last_attack).as_secs() < 1 {
+                                        print!("Attack detected\r");
+                                        last_attack = time::Instant::now();
+                                    } else {
+                                        print!("\r");
+                                    }
                                 }
                             }
                         }
