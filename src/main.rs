@@ -297,12 +297,21 @@ async fn main() -> Result<(), Error> {
                                         }
                                     }
                                 } else if result.1 {
-                                    if time::Instant::now().duration_since(last_attack).as_secs() < 1 {
+                                    if time::Instant::now().duration_since(last_attack).as_millis()
+                                        < 1000
+                                    {
                                         print!("Attack detected\r");
-                                        last_attack = time::Instant::now();
-                                    } else {
-                                        print!("\r");
+                                        io::stdout().flush().unwrap();
                                     }
+                                    last_attack = time::Instant::now();
+                                } else if time::Instant::now()
+                                    .duration_since(last_attack)
+                                    .as_millis()
+                                    > 1000 
+                                {
+                                    // Clear line
+                                    print!("               \r");
+                                    io::stdout().flush().unwrap();
                                 }
                             }
                         }
