@@ -7,7 +7,7 @@ use std::{collections::HashMap, fs, io::prelude::*, iter::Iterator, path::Path};
 
 struct Packet {
     timestamp: f64,
-    id: String,
+    id: u32,
     data: [u8; 8],
     flag: bool,
 }
@@ -99,7 +99,7 @@ pub fn write_features_unsupervised(
 //  - General entropy
 //  - Entropy between packets of the same ID;
 //  - Average Hamming distance between packets of the same ID
-fn extract_features(packets: &[Packet], monitor: &Option<Vec<String>>) -> model::Features {
+fn extract_features(packets: &[Packet], monitor: &Option<Vec<u32>>) -> model::Features {
     let mut feat = HashMap::new();
     let mut ts = Vec::new();
     let mut avg_time = Vec::new();
@@ -114,7 +114,7 @@ fn extract_features(packets: &[Packet], monitor: &Option<Vec<String>>) -> model:
                 let prob = packets.iter().filter(|&x| x.data == p.data).count() as f64
                     / packets.len() as f64;
                 _general_entropy += 0.0 - prob * prob.log2();
-                let stat = feat.entry(p.id.clone()).or_insert((Vec::new(), Vec::new()));
+                let stat = feat.entry(p.id).or_insert((Vec::new(), Vec::new()));
                 stat.0.push(p.timestamp);
                 stat.1.push(p.data);
             }
@@ -125,7 +125,7 @@ fn extract_features(packets: &[Packet], monitor: &Option<Vec<String>>) -> model:
             let prob =
                 packets.iter().filter(|&x| x.data == p.data).count() as f64 / packets.len() as f64;
             _general_entropy += 0.0 - prob * prob.log2();
-            let stat = feat.entry(p.id.clone()).or_insert((Vec::new(), Vec::new()));
+            let stat = feat.entry(p.id).or_insert((Vec::new(), Vec::new()));
             stat.0.push(p.timestamp);
             stat.1.push(p.data);
         }
@@ -246,7 +246,7 @@ pub fn normalize_unsupervised(
 pub fn load(
     paths: Vec<&Path>,
     scaler: Option<Vec<(f64, f64)>>,
-    monitor: &Option<Vec<String>>,
+    monitor: &Option<Vec<u32>>,
 ) -> Result<(Dataset<f64, bool>, Vec<(f64, f64)>), csv::Error> {
     let mut features = Vec::new();
     let mut labels = Vec::new();
@@ -268,7 +268,7 @@ pub fn load(
                 Err(why) => panic!("Could not parse: {}", why),
             };
 
-            let id = fields.get(1).unwrap();
+            let id = u32::from_str_radix(fields.get(1).unwrap(), 16).unwrap();
 
             let dlc: u8 = match fields.get(2).unwrap().parse() {
                 Ok(dlc) => dlc,
@@ -304,14 +304,14 @@ pub fn load(
             if window.len() < window.capacity() {
                 window.push(Packet {
                     timestamp,
-                    id: String::from(id),
+                    id,
                     data,
                     flag,
                 });
             } else {
                 buffer.push(Packet {
                     timestamp,
-                    id: String::from(id),
+                    id,
                     data,
                     flag,
                 });
@@ -350,7 +350,7 @@ pub fn packets_from_csv(paths: Vec<&Path>) -> Result<Vec<model::Packet>, csv::Er
                 ),
             };
 
-            let id = String::from(fields.get(1).unwrap());
+            let id = u32::from_str_radix(fields.get(1).unwrap(), 16).unwrap();
 
             let dlc: u8 = match fields.get(2).unwrap().parse() {
                 Ok(dlc) => dlc,

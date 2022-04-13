@@ -49,21 +49,20 @@ const WINDOW_SLIDE: u16 = 500;
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     let args = Args::parse();
-    let monitor: Option<Vec<String>> = args.monitor.map(|monitor| {
+    let monitor: Option<Vec<u32>> = args.monitor.map(|monitor| {
         monitor
             .split(',')
             .collect::<Vec<&str>>()
             .iter()
-            .map(|s| String::from(*s))
+            .map(|s| u32::from_str_radix(*s, 16).unwrap())
             .collect()
     });
 
-    let baseline_size: usize = 100000
-        * if monitor.is_some() {
-            monitor.clone().unwrap().len()
-        } else {
-            1
-        };
+    let baseline_size: usize = if monitor.is_some() {
+        monitor.clone().unwrap().len() * 1000
+    } else {
+        100000
+    };
 
     if args.extract_features {
         match std::fs::create_dir_all(Path::new("features")) {
@@ -212,7 +211,7 @@ async fn main() -> Result<(), Error> {
             match server::open_socket("can0") {
                 Ok(socket) => {
                     println!("Gathering baseline...");
-                    while baseline.len() <= baseline_size {
+                    while baseline.len() < baseline_size {
                         match socket.read_frame() {
                             Ok(frame) => {
                                 let mut data = frame.data().to_vec();
@@ -220,10 +219,10 @@ async fn main() -> Result<(), Error> {
                                     data.push(0);
                                 }
                                 if let Some(monitor) = &monitor {
-                                    if monitor.contains(&format!("{:X}", &frame.id())) {
+                                    if monitor.contains(&frame.id()) {
                                         baseline.push(Packet::new(
                                             Utc::now().naive_local().timestamp_millis(),
-                                            frame.id().to_string(),
+                                            frame.id(),
                                             data,
                                             false,
                                         ));
@@ -231,7 +230,7 @@ async fn main() -> Result<(), Error> {
                                 } else {
                                     baseline.push(Packet::new(
                                         Utc::now().naive_local().timestamp_millis(),
-                                        frame.id().to_string(),
+                                        frame.id(),
                                         data,
                                         false,
                                     ));
@@ -249,7 +248,6 @@ async fn main() -> Result<(), Error> {
                         }
                     }
                     ids = Ids::new(None, None, WINDOW_SIZE, WINDOW_SLIDE, monitor);
-                    println!("Training model...");
                     ids.train(baseline);
                     println!("Training complete");
                 }
@@ -270,7 +268,7 @@ async fn main() -> Result<(), Error> {
                             }
                             if let Some(result) = ids.push(Packet::new(
                                 Utc::now().naive_local().timestamp_millis(),
-                                frame.id().to_string(),
+                                frame.id(),
                                 data,
                                 false,
                             )) {
@@ -483,7 +481,7 @@ async fn main() -> Result<(), Error> {
                                         Ok(frame) => {
                                             if let Some(result) = ids.push(Packet::new(
                                                 Utc::now().naive_local().timestamp_millis(),
-                                                frame.id().to_string(),
+                                                frame.id(),
                                                 frame.data().to_vec(),
                                                 false,
                                             )) {
