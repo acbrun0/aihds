@@ -307,7 +307,7 @@ async fn main() -> Result<(), Error> {
                                 } else if time::Instant::now()
                                     .duration_since(last_attack)
                                     .as_millis()
-                                    > 1000 
+                                    > 1000
                                 {
                                     // Clear line
                                     print!("               \r");
