@@ -9,13 +9,13 @@ pub type Features = [f64; 3];
 #[derive(Debug)]
 pub struct Packet {
     timestamp: i64,
-    id: String,
+    id: u32,
     data: Vec<u8>,
     flag: bool,
 }
 
 impl Packet {
-    pub fn new(timestamp: i64, id: String, data: Vec<u8>, flag: bool) -> Packet {
+    pub fn new(timestamp: i64, id: u32, data: Vec<u8>, flag: bool) -> Packet {
         Packet {
             timestamp,
             id,
@@ -31,7 +31,7 @@ pub struct Ids {
     window: Vec<Packet>,
     slide: u16,
     counter: u16,
-    monitor: Option<Vec<String>>,
+    monitor: Option<Vec<u32>>,
 }
 
 impl Ids {
@@ -40,7 +40,7 @@ impl Ids {
         scaler: Option<Vec<(f64, f64)>>,
         window_size: usize,
         window_slide: u16,
-        monitor: Option<Vec<String>>,
+        monitor: Option<Vec<u32>>,
     ) -> Ids {
         Ids {
             model,
