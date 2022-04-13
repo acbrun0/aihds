@@ -145,29 +145,55 @@ impl Ids {
 
     pub fn push(&mut self, packet: Packet) -> Option<(Features, bool, (i64, i64))> {
         let mut prediction: Option<(Features, bool, (i64, i64))> = None;
-        if self.window.len() < self.window.capacity() {
-            self.window.push(packet);
-        } else {
-            self.window.remove(0);
-            self.window.push(packet);
-            self.counter += 1;
-            if self.counter == self.slide {
-                prediction = if let Some(pred) = self.predict() {
-                    Some((
-                        pred.0,
-                        pred.1,
-                        (
-                            self.window[0].timestamp,
-                            self.window[self.window.capacity() - 1].timestamp,
-                        ),
-                    ))
+        if let Some(monitor) = &self.monitor {
+            if monitor.contains(&packet.id) {
+                if self.window.len() < self.window.capacity() {
+                    self.window.push(packet);
                 } else {
-                    None
-                };
-                self.counter = 0;
+                    self.window.remove(0);
+                    self.window.push(packet);
+                    self.counter += 1;
+                    if self.counter == self.slide {
+                        prediction = if let Some(pred) = self.predict() {
+                            Some((
+                                pred.0,
+                                pred.1,
+                                (
+                                    self.window[0].timestamp,
+                                    self.window[self.window.capacity() - 1].timestamp,
+                                ),
+                            ))
+                        } else {
+                            None
+                        };
+                        self.counter = 0;
+                    }
+                }
+            }
+        } else {
+            if self.window.len() < self.window.capacity() {
+                self.window.push(packet);
+            } else {
+                self.window.remove(0);
+                self.window.push(packet);
+                self.counter += 1;
+                if self.counter == self.slide {
+                    prediction = if let Some(pred) = self.predict() {
+                        Some((
+                            pred.0,
+                            pred.1,
+                            (
+                                self.window[0].timestamp,
+                                self.window[self.window.capacity() - 1].timestamp,
+                            ),
+                        ))
+                    } else {
+                        None
+                    };
+                    self.counter = 0;
+                }
             }
         }
-
         prediction
     }
 
