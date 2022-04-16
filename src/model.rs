@@ -160,8 +160,7 @@ impl Ids {
                     Ok(_) => {
                         dataset::write_features_unsupervised(
                             Path::new("models/train.csv"),
-                            &dataset,
-                            false,
+                            &dataset
                         )
                         .expect("Could not save train features");
                         if let Some(scaler) = scaler {
@@ -207,8 +206,7 @@ impl Ids {
         match dataset::write_features(
             Path::new("models/test.csv"),
             &Dataset::new(Array2::from(features), Array1::from(predictions.iter().map(|p| p.1).collect::<Vec<bool>>()))
-                .with_feature_names(vec!["AvgTime", "Entropy", "HammingDist", "Label"]),
-            false,
+                .with_feature_names(vec!["AvgTime", "Entropy", "HammingDist", "Label"])
         ) {
             Ok(_) => (),
             Err(why) => println!("Could not save test features: {}", why),
@@ -339,6 +337,8 @@ impl Ids {
                     }
                 }
             }
+
+            println!("Average time between packets: {:?}", avg_time);
 
             Some([
                 avg_time.iter().sum::<f64>() / avg_time.len() as f64,

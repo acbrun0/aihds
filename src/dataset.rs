@@ -17,77 +17,43 @@ const WINDOW_SLIDE: usize = 50;
 
 pub fn write_features(
     path: &Path,
-    dataset: &Dataset<f64, bool>,
-    is_libsvm: bool,
+    dataset: &Dataset<f64, bool>
 ) -> Result<(), csv::Error> {
-    if is_libsvm {
-        let mut file = fs::File::create(path).expect("Could not create file.");
-        for (record, target) in dataset
-            .records
-            .outer_iter()
-            .zip(dataset.targets.clone().into_raw_vec())
-        {
-            file.write_all(
-                format!(
-                    "{} 1:{} 2:{} 3:{}\n",
-                    if target { "-1" } else { "+1" },
-                    record[0],
-                    record[1],
-                    record[2]
-                )
-                .as_bytes(),
-            )
-            .expect("Unable to write to file.");
-        }
-    } else {
-        let mut wtr = Writer::from_path(path)?;
-        match wtr.write_record(dataset.feature_names()) {
-            Ok(()) => {
-                for (record, target) in dataset.records.outer_iter().zip(dataset.targets.clone()) {
-                    wtr.write_record(&[
-                        record[0].to_string(),
-                        record[1].to_string(),
-                        record[2].to_string(),
-                        target.to_string(),
-                    ])?;
-                }
-                wtr.flush()?;
+    let mut wtr = Writer::from_path(path)?;
+    match wtr.write_record(dataset.feature_names()) {
+        Ok(()) => {
+            for (record, target) in dataset.records.outer_iter().zip(dataset.targets.clone()) {
+                wtr.write_record(&[
+                    record[0].to_string(),
+                    record[1].to_string(),
+                    record[2].to_string(),
+                    target.to_string(),
+                ])?;
             }
-            Err(why) => panic!("Could not write to {}: {}", path.display(), why),
+            wtr.flush()?;
         }
+        Err(why) => panic!("Could not write to {}: {}", path.display(), why),
     }
     Ok(())
 }
 
 pub fn write_features_unsupervised(
     path: &Path,
-    dataset: &Dataset<f64, ()>,
-    is_libsvm: bool,
+    dataset: &Dataset<f64, ()>
 ) -> Result<(), csv::Error> {
-    if is_libsvm {
-        let mut file = fs::File::create(path).expect("Could not create file.");
-        let _targets = dataset.targets.clone().into_raw_vec();
-        for (_i, record) in dataset.records.outer_iter().enumerate() {
-            file.write_all(
-                format!("0 1:{} 2:{} 3:{}\n", record[0], record[1], record[2]).as_bytes(),
-            )
-            .expect("Unable to write to file.");
-        }
-    } else {
-        let mut wtr = Writer::from_path(path)?;
-        match wtr.write_record(dataset.feature_names()) {
-            Ok(()) => {
-                for record in dataset.records.outer_iter() {
-                    wtr.write_record(&[
-                        record[0].to_string(),
-                        record[1].to_string(),
-                        record[2].to_string(),
-                    ])?;
-                }
-                wtr.flush()?;
+    let mut wtr = Writer::from_path(path)?;
+    match wtr.write_record(dataset.feature_names()) {
+        Ok(()) => {
+            for record in dataset.records.outer_iter() {
+                wtr.write_record(&[
+                    record[0].to_string(),
+                    record[1].to_string(),
+                    record[2].to_string(),
+                ])?;
             }
-            Err(why) => panic!("Could not write to {}: {}", path.display(), why),
+            wtr.flush()?;
         }
+        Err(why) => panic!("Could not write to {}: {}", path.display(), why),
     }
     Ok(())
 }

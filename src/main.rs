@@ -26,9 +26,6 @@ struct Args {
     /// Perform grid search optimization on SVM
     #[clap(long)]
     grid_search: bool,
-    /// Use libsvm format
-    #[clap(long)]
-    libsvm: bool,
     /// Join features into a single file
     #[clap(long)]
     join: bool,
@@ -76,12 +73,8 @@ async fn main() -> Result<(), Error> {
                 match dataset::load(paths, None, &monitor) {
                     Ok((dataset, _)) => {
                         match dataset::write_features(
-                            Path::new(&format!(
-                                "{}/features.csv",
-                                if args.libsvm { "libsvm" } else { "features" }
-                            )),
-                            &dataset,
-                            args.libsvm,
+                            Path::new("features/features.csv"),
+                            &dataset
                         ) {
                             Ok(_) => (),
                             Err(why) => println!("Could not write features: {}", why),
@@ -98,8 +91,7 @@ async fn main() -> Result<(), Error> {
                                     "features/{}.csv",
                                     path.file_stem().unwrap().to_str().unwrap()
                                 )),
-                                &dataset,
-                                false,
+                                &dataset
                             ) {
                                 Ok(_) => (),
                                 Err(why) => {
@@ -129,12 +121,8 @@ async fn main() -> Result<(), Error> {
                 match dataset::load(paths, scaler, &monitor) {
                     Ok((dataset, _)) => {
                         match dataset::write_features(
-                            Path::new(&format!(
-                                "{}/targets.txt",
-                                if args.libsvm { "libsvm" } else { "features" }
-                            )),
-                            &dataset,
-                            args.libsvm,
+                            Path::new("features/targets.csv"),
+                            &dataset
                         ) {
                             Ok(_) => (),
                             Err(why) => println!("Could not write features: {}", why),
@@ -153,8 +141,7 @@ async fn main() -> Result<(), Error> {
                                     "features/{}.csv",
                                     path.file_stem().unwrap().to_str().unwrap()
                                 )),
-                                &dataset,
-                                args.libsvm,
+                                &dataset
                             ) {
                                 Ok(_) => (),
                                 Err(why) => {
