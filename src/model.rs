@@ -1,7 +1,9 @@
 use crate::dataset;
+use chrono::Utc;
 use linfa::prelude::*;
 use linfa_svm::Svm;
 use ndarray::{Array1, Array2};
+use socketcan::CANSocket;
 use std::{collections::HashMap, fs, path::Path, time::Instant};
 
 pub type Features = [f64; 3];
@@ -31,7 +33,7 @@ pub struct Ids {
     window: Vec<Packet>,
     slide: u16,
     counter: u16,
-    monitor: Option<Vec<u32>>,
+    monitor: Option<Vec<u32>>
 }
 
 impl Ids {
@@ -40,7 +42,7 @@ impl Ids {
         scaler: Option<Vec<(f64, f64)>>,
         window_size: usize,
         window_slide: u16,
-        monitor: Option<Vec<u32>>,
+        monitor: Option<Vec<u32>>
     ) -> Ids {
         Ids {
             model,
@@ -48,38 +50,102 @@ impl Ids {
             window: Vec::with_capacity(window_size),
             slide: window_slide,
             counter: 0,
-            monitor,
+            monitor
         }
     }
 
-    pub fn train(&mut self, packets: Vec<Packet>) {
+    pub fn train(
+        &mut self,
+        socket: Option<&CANSocket>,
+        files: Option<Vec<&Path>>,
+        baseline_len: usize,
+    ) {
         let mut features: Vec<Features> = Vec::new();
         let mut labels = Vec::new();
 
-        for packet in packets {
-            if self.window.len() < self.window.capacity() {
-                self.window.push(packet);
-            } else {
-                self.window.remove(0);
-                self.window.push(packet);
-                self.counter += 1;
-                if self.counter == self.slide {
-                    if let Some(extracted) = self.extract_features() {
-                        let mut feat: Features = [0.0, 0.0, 0.0];
-                        for (i, f) in extracted.iter().enumerate() {
-                            feat[i] = *f;
+        if let Some(socket) = socket {
+            while features.len() < baseline_len {
+                match socket.read_frame() {
+                    Ok(frame) => {
+                        let mut data = frame.data().to_vec();
+                        while data.len() < 8 {
+                            data.push(0);
                         }
-                        features.push(feat);
-                        labels.push(());
-                        self.counter = 0;
+                        let packet = Packet::new(
+                            Utc::now().naive_local().timestamp_millis(),
+                            frame.id(),
+                            data,
+                            false,
+                        );
+                        if self.window.len() < self.window.capacity() {
+                            self.window.push(packet);
+                        } else {
+                            self.window.remove(0);
+                            self.window.push(packet);
+                            self.counter += 1;
+                            if self.counter == self.slide {
+                                if let Some(extracted) = self.extract_features() {
+                                    let mut feat: Features = [0.0, 0.0, 0.0];
+                                    for (i, f) in extracted.iter().enumerate() {
+                                        feat[i] = *f;
+                                    }
+                                    features.push(feat);
+                                    labels.push(());
+                                    self.counter = 0;
+                                }
+                            }
+                        }
+                    }
+                    Err(why) => panic!("Could not read from socket: {}", why),
+                }
+            }
+        } else if let Some(paths) = files {
+            match dataset::packets_from_csv(paths) {
+                Ok(packets) => {
+                    for packet in packets {
+                        if let Some(filter) = &self.monitor {
+                            if !filter.contains(&packet.id) {
+                                continue;
+                            }
+                        }
+                        if features.len() < baseline_len {
+                            if self.window.len() < self.window.capacity() {
+                                self.window.push(packet);
+                            } else {
+                                self.window.remove(0);
+                                self.window.push(packet);
+                                self.counter += 1;
+                                if self.counter == self.slide {
+                                    if let Some(extracted) = self.extract_features() {
+                                        let mut feat: Features = [0.0, 0.0, 0.0];
+                                        for (i, f) in extracted.iter().enumerate() {
+                                            feat[i] = *f;
+                                        }
+                                        features.push(feat);
+                                        labels.push(());
+                                        self.counter = 0;
+                                    }
+                                }
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+                    if features.len() < baseline_len {
+                        panic!(
+                            "Not enough packets to compute features: {} out of {}",
+                            features.len(),
+                            baseline_len
+                        );
                     }
                 }
+                Err(why) => panic!("Could not load datasets: {}", why),
             }
         }
 
         let mut dataset = Dataset::new(Array2::from(features), Array1::from(labels))
             .with_feature_names(vec!["AvgTime", "Entropy", "HammingDist"]);
-        self.scaler = dataset::normalize_unsupervised(&mut dataset, &None);
+        let scaler = dataset::normalize_unsupervised(&mut dataset, &None);
 
         match Svm::<f64, _>::params()
             .gaussian_kernel(1.0)
@@ -98,8 +164,11 @@ impl Ids {
                             false,
                         )
                         .expect("Could not save train features");
-                        fs::write("models/scaler", bincode::serialize(&self.scaler).unwrap())
-                            .expect("Could not save scaler.");
+                        if let Some(scaler) = scaler {
+                            fs::write("models/scaler", bincode::serialize(&scaler).unwrap())
+                                .expect("Could not save scaler.");
+                            self.scaler = Some(scaler);
+                        }
                         save(&model, Path::new("models/svm")).expect("Could not save model");
                     }
                     Err(why) => panic!("Could not create models directory: {}", why),
@@ -122,6 +191,11 @@ impl Ids {
 
         let start = Instant::now();
         for packet in packets {
+            if let Some(filter) = &self.monitor {
+                if !filter.contains(&packet.id) {
+                    continue;
+                }
+            }
             if let Some(result) = self.push(packet) {
                 features.push(result.0);
                 predictions.push(result);
@@ -132,7 +206,7 @@ impl Ids {
 
         match dataset::write_features(
             Path::new("models/test.csv"),
-            &Dataset::new(Array2::from(features), Array1::from(real.clone()))
+            &Dataset::new(Array2::from(features), Array1::from(predictions.iter().map(|p| p.1).collect::<Vec<bool>>()))
                 .with_feature_names(vec!["AvgTime", "Entropy", "HammingDist", "Label"]),
             false,
         ) {
@@ -145,53 +219,26 @@ impl Ids {
 
     pub fn push(&mut self, packet: Packet) -> Option<(Features, bool, (i64, i64))> {
         let mut prediction: Option<(Features, bool, (i64, i64))> = None;
-        if let Some(monitor) = &self.monitor {
-            if monitor.contains(&packet.id) {
-                if self.window.len() < self.window.capacity() {
-                    self.window.push(packet);
-                } else {
-                    self.window.remove(0);
-                    self.window.push(packet);
-                    self.counter += 1;
-                    if self.counter == self.slide {
-                        prediction = if let Some(pred) = self.predict() {
-                            Some((
-                                pred.0,
-                                pred.1,
-                                (
-                                    self.window[0].timestamp,
-                                    self.window[self.window.capacity() - 1].timestamp,
-                                ),
-                            ))
-                        } else {
-                            None
-                        };
-                        self.counter = 0;
-                    }
-                }
-            }
+        if self.window.len() < self.window.capacity() {
+            self.window.push(packet);
         } else {
-            if self.window.len() < self.window.capacity() {
-                self.window.push(packet);
-            } else {
-                self.window.remove(0);
-                self.window.push(packet);
-                self.counter += 1;
-                if self.counter == self.slide {
-                    prediction = if let Some(pred) = self.predict() {
-                        Some((
-                            pred.0,
-                            pred.1,
-                            (
-                                self.window[0].timestamp,
-                                self.window[self.window.capacity() - 1].timestamp,
-                            ),
-                        ))
-                    } else {
-                        None
-                    };
-                    self.counter = 0;
-                }
+            self.window.remove(0);
+            self.window.push(packet);
+            self.counter += 1;
+            if self.counter == self.slide {
+                prediction = if let Some(pred) = self.predict() {
+                    Some((
+                        pred.0,
+                        pred.1,
+                        (
+                            self.window[0].timestamp,
+                            self.window[self.window.capacity() - 1].timestamp,
+                        ),
+                    ))
+                } else {
+                    None
+                };
+                self.counter = 0;
             }
         }
         prediction
@@ -232,20 +279,10 @@ impl Ids {
         let mut entropy = Vec::new();
         let mut hamming: Vec<f64> = Vec::new();
 
-        if let Some(ids) = &self.monitor {
-            for p in &self.window {
-                if ids.contains(&p.id) {
-                    let val = feat.entry(&p.id).or_insert((Vec::new(), Vec::new()));
-                    val.0.push(p.timestamp);
-                    val.1.push(&p.data);
-                }
-            }
-        } else {
-            for p in &self.window {
-                let val = feat.entry(&p.id).or_insert((Vec::new(), Vec::new()));
-                val.0.push(p.timestamp);
-                val.1.push(&p.data);
-            }
+        for p in &self.window {
+            let val = feat.entry(&p.id).or_insert((Vec::new(), Vec::new()));
+            val.0.push(p.timestamp);
+            val.1.push(&p.data);
         }
 
         if !feat.is_empty() {
