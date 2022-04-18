@@ -6,7 +6,12 @@ use chrono::Utc;
 use clap::Parser;
 use linfa::prelude::*;
 use model::{svm, Ids, Packet};
-use std::{fs, io, io::Write, path::Path, thread, time};
+use std::{
+    fs::{self, File},
+    io::{self, Write},
+    path::Path,
+    thread, time,
+};
 
 #[derive(Parser)]
 #[clap(author, version, about)]
@@ -40,8 +45,8 @@ struct Args {
     live: bool,
 }
 
-const WINDOW_SIZE: usize = 1000;
-const WINDOW_SLIDE: u16 = 500;
+const WINDOW_SIZE: usize = 500;
+const WINDOW_SLIDE: u16 = 125;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -72,10 +77,8 @@ async fn main() -> Result<(), Error> {
             if args.join {
                 match dataset::load(paths, None, &monitor) {
                     Ok((dataset, _)) => {
-                        match dataset::write_features(
-                            Path::new("features/features.csv"),
-                            &dataset
-                        ) {
+                        match dataset::write_features(Path::new("features/features.csv"), &dataset)
+                        {
                             Ok(_) => (),
                             Err(why) => println!("Could not write features: {}", why),
                         }
@@ -91,7 +94,7 @@ async fn main() -> Result<(), Error> {
                                     "features/{}.csv",
                                     path.file_stem().unwrap().to_str().unwrap()
                                 )),
-                                &dataset
+                                &dataset,
                             ) {
                                 Ok(_) => (),
                                 Err(why) => {
@@ -120,10 +123,7 @@ async fn main() -> Result<(), Error> {
             if args.join {
                 match dataset::load(paths, scaler, &monitor) {
                     Ok((dataset, _)) => {
-                        match dataset::write_features(
-                            Path::new("features/targets.csv"),
-                            &dataset
-                        ) {
+                        match dataset::write_features(Path::new("features/targets.csv"), &dataset) {
                             Ok(_) => (),
                             Err(why) => println!("Could not write features: {}", why),
                         }
@@ -141,7 +141,7 @@ async fn main() -> Result<(), Error> {
                                     "features/{}.csv",
                                     path.file_stem().unwrap().to_str().unwrap()
                                 )),
-                                &dataset
+                                &dataset,
                             ) {
                                 Ok(_) => (),
                                 Err(why) => {
@@ -166,7 +166,13 @@ async fn main() -> Result<(), Error> {
         if let Some(modelpath) = args.model {
             let model = svm::load(Path::new(&modelpath)).expect("Could not load model");
             let scaler = bincode::deserialize(&fs::read("models/scaler").unwrap()).unwrap();
-            ids = Ids::new(Some(model), Some(scaler), WINDOW_SIZE, WINDOW_SLIDE, monitor);
+            ids = Ids::new(
+                Some(model),
+                Some(scaler),
+                WINDOW_SIZE,
+                WINDOW_SLIDE,
+                monitor,
+            );
             println!("Loaded model from {}", modelpath);
         } else {
             ids = Ids::new(None, None, WINDOW_SIZE, WINDOW_SLIDE, monitor);
@@ -175,6 +181,12 @@ async fn main() -> Result<(), Error> {
         }
 
         println!("Analysing network...");
+        let mut log = match File::create("models/log.csv") {
+            Ok(file) => file,
+            Err(why) => panic!("Could not create log file: {}", why),
+        };
+        log.write_all(b"AvgTime,Entropy,HammingDist,Label\n")
+            .expect("Unable to write to log");
         loop {
             match socket.read_frame() {
                 Ok(frame) => {
@@ -188,6 +200,14 @@ async fn main() -> Result<(), Error> {
                         data,
                         false,
                     )) {
+                        log.write_all(
+                            format!(
+                                "{},{},{},{}\n",
+                                result.0[0], result.0[1], result.0[2], result.1
+                            )
+                            .as_bytes(),
+                        )
+                        .expect("Unable to write to log");
                         if let Some(url) = &args.streaming {
                             match server::post(
                                 &client,
@@ -326,8 +346,13 @@ async fn main() -> Result<(), Error> {
                         match dataset::packets_from_csv(test_paths) {
                             Ok(packets) => {
                                 let client = reqwest::Client::new();
-                                let mut ids =
-                                    Ids::new(Some(model), Some(scaler), WINDOW_SIZE, WINDOW_SLIDE, monitor);
+                                let mut ids = Ids::new(
+                                    Some(model),
+                                    Some(scaler),
+                                    WINDOW_SIZE,
+                                    WINDOW_SLIDE,
+                                    monitor,
+                                );
                                 for packet in packets {
                                     if let Some(result) = ids.push(packet) {
                                         match server::post(
@@ -361,8 +386,13 @@ async fn main() -> Result<(), Error> {
                         let client = reqwest::Client::new();
                         let scaler =
                             bincode::deserialize(&fs::read("models/scaler").unwrap()).unwrap();
-                        let mut ids =
-                            Ids::new(Some(model), Some(scaler), WINDOW_SIZE, WINDOW_SLIDE, monitor);
+                        let mut ids = Ids::new(
+                            Some(model),
+                            Some(scaler),
+                            WINDOW_SIZE,
+                            WINDOW_SLIDE,
+                            monitor,
+                        );
                         loop {
                             match socket.read_frame() {
                                 Ok(frame) => {
@@ -408,9 +438,14 @@ async fn main() -> Result<(), Error> {
                     let scaler = bincode::deserialize(&fs::read("models/scaler").unwrap()).unwrap();
                     match dataset::packets_from_csv(test_paths) {
                         Ok(packets) => {
-                            let (real, pred, speed) =
-                                Ids::new(Some(model), Some(scaler), WINDOW_SIZE, WINDOW_SLIDE, monitor)
-                                    .test(packets);
+                            let (real, pred, speed) = Ids::new(
+                                Some(model),
+                                Some(scaler),
+                                WINDOW_SIZE,
+                                WINDOW_SLIDE,
+                                monitor,
+                            )
+                            .test(packets);
                             let pred: Vec<bool> = pred.into_iter().map(|p| p.1).collect();
                             let mut tp = 0;
                             let mut fp = 0;

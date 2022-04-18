@@ -4,7 +4,13 @@ use linfa::prelude::*;
 use linfa_svm::Svm;
 use ndarray::{Array1, Array2};
 use socketcan::CANSocket;
-use std::{collections::HashMap, fs, path::Path, time::Instant};
+use std::{
+    collections::HashMap,
+    fs,
+    io::{self, Write},
+    path::Path,
+    time::Instant,
+};
 
 pub type Features = [f64; 3];
 
@@ -33,7 +39,7 @@ pub struct Ids {
     window: Vec<Packet>,
     slide: u16,
     counter: u16,
-    monitor: Option<Vec<u32>>
+    monitor: Option<Vec<u32>>,
 }
 
 impl Ids {
@@ -42,7 +48,7 @@ impl Ids {
         scaler: Option<Vec<(f64, f64)>>,
         window_size: usize,
         window_slide: u16,
-        monitor: Option<Vec<u32>>
+        monitor: Option<Vec<u32>>,
     ) -> Ids {
         Ids {
             model,
@@ -50,7 +56,7 @@ impl Ids {
             window: Vec::with_capacity(window_size),
             slide: window_slide,
             counter: 0,
-            monitor
+            monitor,
         }
     }
 
@@ -64,6 +70,7 @@ impl Ids {
         let mut labels = Vec::new();
 
         if let Some(socket) = socket {
+            println!("Gathering baseline...");
             while features.len() < baseline_len {
                 match socket.read_frame() {
                     Ok(frame) => {
@@ -94,6 +101,13 @@ impl Ids {
                                     self.counter = 0;
                                 }
                             }
+                        }
+                        if features.len() as f32 % (baseline_len as f32 * 0.01) == 0.0 {
+                            print!(
+                                "{:.0}%\r",
+                                features.len() as f32 / baseline_len as f32 * 100.0
+                            );
+                            io::stdout().flush().unwrap();
                         }
                     }
                     Err(why) => panic!("Could not read from socket: {}", why),
@@ -160,7 +174,7 @@ impl Ids {
                     Ok(_) => {
                         dataset::write_features_unsupervised(
                             Path::new("models/train.csv"),
-                            &dataset
+                            &dataset,
                         )
                         .expect("Could not save train features");
                         if let Some(scaler) = scaler {
@@ -205,8 +219,11 @@ impl Ids {
 
         match dataset::write_features(
             Path::new("models/test.csv"),
-            &Dataset::new(Array2::from(features), Array1::from(predictions.iter().map(|p| p.1).collect::<Vec<bool>>()))
-                .with_feature_names(vec!["AvgTime", "Entropy", "HammingDist", "Label"])
+            &Dataset::new(
+                Array2::from(features),
+                Array1::from(predictions.iter().map(|p| p.1).collect::<Vec<bool>>()),
+            )
+            .with_feature_names(vec!["AvgTime", "Entropy", "HammingDist", "Label"]),
         ) {
             Ok(_) => (),
             Err(why) => println!("Could not save test features: {}", why),
@@ -337,8 +354,6 @@ impl Ids {
                     }
                 }
             }
-
-            println!("Average time between packets: {:?}", avg_time);
 
             Some([
                 avg_time.iter().sum::<f64>() / avg_time.len() as f64,

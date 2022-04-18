@@ -1,4 +1,4 @@
-use socketcan::{CANFilter, CANSocket};
+use socketcan::{CANFilter, CANSocket, SFF_MASK};
 
 pub fn open_socket(interface: &str, filter: &Option<Vec<u32>>) -> CANSocket {
     match CANSocket::open(interface) {
@@ -6,12 +6,14 @@ pub fn open_socket(interface: &str, filter: &Option<Vec<u32>>) -> CANSocket {
             if let Some(filter) = filter {
                 let mut filters = Vec::new();
                 for id in filter {
-                    match CANFilter::new(*id, 0) {
+                    match CANFilter::new(*id, SFF_MASK) {
                         Ok(filter) => filters.push(filter),
                         Err(why) => panic!("Could not create CAN filter: {}", why),
                     };
                 }
-                socket.set_filter(filters.as_slice()).expect("Could not set filter on CAN socket")
+                socket
+                    .set_filter(filters.as_slice())
+                    .expect("Could not set filter on CAN socket")
             }
             socket
         }

@@ -3,7 +3,7 @@ use csv::{StringRecord, Writer};
 use linfa::dataset::Dataset;
 use ndarray::{Array1, Array2};
 use ndarray_stats::QuantileExt;
-use std::{collections::HashMap, fs, io::prelude::*, iter::Iterator, path::Path};
+use std::{collections::HashMap, iter::Iterator, path::Path};
 
 struct Packet {
     timestamp: f64,
@@ -15,10 +15,7 @@ struct Packet {
 const WINDOW_SIZE: usize = 200;
 const WINDOW_SLIDE: usize = 50;
 
-pub fn write_features(
-    path: &Path,
-    dataset: &Dataset<f64, bool>
-) -> Result<(), csv::Error> {
+pub fn write_features(path: &Path, dataset: &Dataset<f64, bool>) -> Result<(), csv::Error> {
     let mut wtr = Writer::from_path(path)?;
     match wtr.write_record(dataset.feature_names()) {
         Ok(()) => {
@@ -39,7 +36,7 @@ pub fn write_features(
 
 pub fn write_features_unsupervised(
     path: &Path,
-    dataset: &Dataset<f64, ()>
+    dataset: &Dataset<f64, ()>,
 ) -> Result<(), csv::Error> {
     let mut wtr = Writer::from_path(path)?;
     match wtr.write_record(dataset.feature_names()) {
