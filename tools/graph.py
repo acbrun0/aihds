@@ -6,6 +6,17 @@ import matplotlib.pyplot as plt
 from matplotlib.pyplot import figure
 import numpy as np
 
+def label_to_color(label):
+    match label:
+        case 0:
+            return 'g'
+        case 1:
+            return 'b'
+        case 2:
+            return 'y'
+        case 3:
+            return 'r'
+
 def main():
     parser = argparse.ArgumentParser(description="Generate plot from CSV data.")
     parser.add_argument("dataset", nargs="*", help="Path to CSV file.")
@@ -21,7 +32,7 @@ def main():
             compare = pd.read_csv(path, usecols=[0, 1, 2], names=["Entropy", "Hamming distance", "Label"])
             ax = plt.figure().add_subplot()
             ax.scatter(normal["Entropy"], normal["Hamming distance"], label=args.reference)
-            ax.scatter(compare["Entropy"], compare["Hamming distance"], c=np.where(compare["Label"], "r", "g"), label=path)
+            ax.scatter(compare["Entropy"], compare["Hamming distance"], c=compare["Label"].apply(label_to_color).values if "Label" in compare else "c", label=path)
             plt.xlabel("Entropy")
             plt.ylabel("Hamming distance")
             plt.legend(loc="best")
@@ -36,14 +47,14 @@ def main():
                 ax.set_xlabel("AvgTime")
                 ax.set_ylabel("Entropy")
                 ax.set_zlabel("HammingDist")
-                ax.scatter(dataset["AvgTime"], dataset["Entropy"], dataset["HammingDist"], c=np.where(dataset["Label"], "r", "g") if "Label" in dataset else "c")
+                ax.scatter(dataset["AvgTime"], dataset["Entropy"], dataset["HammingDist"], c=dataset["Label"].apply(label_to_color).values if "Label" in dataset else "c")
                 plt.savefig(f"graphs/{Path(path).stem}.png")
             for col in dataset:
                 if col != "Label":
                     figure(figsize=(15, 5))
                     plt.xlabel("Window")
                     plt.ylabel(col)
-                    plt.scatter(np.arange(0, len(dataset[col])), dataset[col], c=np.where(dataset["Label"], "r", "g") if "Label" in dataset else "c")
+                    plt.scatter(np.arange(0, len(dataset[col])), dataset[col], c=dataset["Label"].apply(label_to_color).values if "Label" in dataset else "c")
                     plt.savefig(f"graphs/{Path(path).stem}/{col}.png")
 
 

@@ -27,7 +27,7 @@ struct Args {
     model: Option<String>,
     /// Extracts features to CSV files
     #[clap(long)]
-    extract_features: bool,
+    extract_features: Option<String>,
     /// Perform grid search optimization on SVM
     #[clap(long)]
     grid_search: bool,
@@ -46,7 +46,7 @@ struct Args {
 }
 
 const WINDOW_SIZE: usize = 500;
-const WINDOW_SLIDE: u16 = 125;
+const WINDOW_SLIDE: u16 = (WINDOW_SIZE as f64 * 0.25) as u16;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -66,95 +66,30 @@ async fn main() -> Result<(), Error> {
         100000
     };
 
-    if args.extract_features {
-        match std::fs::create_dir_all(Path::new("features")) {
-            Ok(_) => (),
-            Err(why) => panic!("Could not create features directory: {}", why),
-        };
-        if let Some(paths) = args.train {
+    if let Some(paths) = args.extract_features {
+        if let Some(modelpath) = args.model {
             let paths = paths.split(',').collect::<Vec<&str>>();
             let paths = paths.iter().map(Path::new).collect();
-            if args.join {
-                match dataset::load(paths, None, &monitor) {
-                    Ok((dataset, _)) => {
-                        match dataset::write_features(Path::new("features/features.csv"), &dataset)
-                        {
-                            Ok(_) => (),
-                            Err(why) => println!("Could not write features: {}", why),
-                        }
-                    }
-                    Err(why) => panic!("Could not load dataset: {}", why),
+            let model = svm::load(Path::new(&modelpath)).expect("Could not load model");
+            let scaler = bincode::deserialize(&fs::read("models/scaler").unwrap()).unwrap();
+            let mut ids = Ids::new(
+                Some(model),
+                Some(scaler),
+                WINDOW_SIZE,
+                WINDOW_SLIDE,
+                monitor,
+            );
+            println!("Loaded model from {}", modelpath);
+            match dataset::packets_from_csv(paths) {
+                Ok(packets) => {
+                    ids.test(packets);
+                    return Ok(());
                 }
-            } else {
-                for path in paths {
-                    match dataset::load(vec![path], None, &monitor) {
-                        Ok((dataset, _)) => {
-                            match dataset::write_features(
-                                Path::new(&format!(
-                                    "features/{}.csv",
-                                    path.file_stem().unwrap().to_str().unwrap()
-                                )),
-                                &dataset,
-                            ) {
-                                Ok(_) => (),
-                                Err(why) => {
-                                    println!("Could not write features: {}", why)
-                                }
-                            }
-                        }
-                        Err(why) => panic!("Could not load dataset: {}", why),
-                    };
-                }
-            };
+                Err(why) => panic!("Could not load dataset: {}", why),
+            }
+        } else {
+            panic!("Please specify a path to the model using --model")
         }
-        if let Some(paths) = args.test {
-            let scaler: Option<Vec<(f64, f64)>> = match fs::read("models/scaler") {
-                Ok(scaler) => match bincode::deserialize(&scaler) {
-                    Ok(scaler) => Some(scaler),
-                    Err(why) => panic!("Could not deserialize scaler: {}", why),
-                },
-                Err(_) => {
-                    println!("Scaler not found in models/scaler. Proceeding without.");
-                    None
-                }
-            };
-            let paths = paths.split(',').collect::<Vec<&str>>();
-            let paths = paths.iter().map(Path::new).collect();
-            if args.join {
-                match dataset::load(paths, scaler, &monitor) {
-                    Ok((dataset, _)) => {
-                        match dataset::write_features(Path::new("features/targets.csv"), &dataset) {
-                            Ok(_) => (),
-                            Err(why) => println!("Could not write features: {}", why),
-                        }
-                    }
-                    Err(why) => panic!("Could not load dataset: {}", why),
-                }
-            } else {
-                let mut scaler_copy = scaler;
-                for path in paths {
-                    match dataset::load(vec![path], scaler_copy, &monitor) {
-                        Ok((dataset, scaler)) => {
-                            scaler_copy = Some(scaler);
-                            match dataset::write_features(
-                                Path::new(&format!(
-                                    "features/{}.csv",
-                                    path.file_stem().unwrap().to_str().unwrap()
-                                )),
-                                &dataset,
-                            ) {
-                                Ok(_) => (),
-                                Err(why) => {
-                                    println!("Could not write features: {}", why)
-                                }
-                            }
-                        }
-                        Err(why) => panic!("Could not load dataset: {}", why),
-                    };
-                }
-            };
-        }
-        return Ok(());
     }
 
     if args.live {

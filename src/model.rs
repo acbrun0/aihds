@@ -122,36 +122,26 @@ impl Ids {
                                 continue;
                             }
                         }
-                        if features.len() < baseline_len {
-                            if self.window.len() < self.window.capacity() {
-                                self.window.push(packet);
-                            } else {
-                                self.window.remove(0);
-                                self.window.push(packet);
-                                self.counter += 1;
-                                if self.counter == self.slide {
-                                    if let Some(extracted) = self.extract_features() {
-                                        let mut feat: Features = [0.0, 0.0, 0.0];
-                                        for (i, f) in extracted.iter().enumerate() {
-                                            feat[i] = *f;
-                                        }
-                                        features.push(feat);
-                                        labels.push(());
-                                        self.counter = 0;
+                        if self.window.len() < self.window.capacity() {
+                            self.window.push(packet);
+                        } else {
+                            self.window.remove(0);
+                            self.window.push(packet);
+                            self.counter += 1;
+                            if self.counter == self.slide {
+                                if let Some(extracted) = self.extract_features() {
+                                    let mut feat: Features = [0.0, 0.0, 0.0];
+                                    for (i, f) in extracted.iter().enumerate() {
+                                        feat[i] = *f;
                                     }
+                                    features.push(feat);
+                                    labels.push(());
+                                    self.counter = 0;
                                 }
                             }
-                        } else {
-                            break;
                         }
                     }
-                    if features.len() < baseline_len {
-                        panic!(
-                            "Not enough packets to compute features: {} out of {}",
-                            features.len(),
-                            baseline_len
-                        );
-                    }
+                    println!("Training with {} features", features.len());
                 }
                 Err(why) => panic!("Could not load datasets: {}", why),
             }
@@ -159,10 +149,10 @@ impl Ids {
 
         let mut dataset = Dataset::new(Array2::from(features), Array1::from(labels))
             .with_feature_names(vec!["AvgTime", "Entropy", "HammingDist"]);
-        let scaler = dataset::normalize_unsupervised(&mut dataset, &None);
+        let scaler = dataset::normalize(&mut dataset, &None);
 
         match Svm::<f64, _>::params()
-            .gaussian_kernel(1.0)
+            .gaussian_kernel(10.0)
             // .polynomial_kernel(0.0, 3.0)
             .nu_weight(0.001)
             .fit(&dataset)
@@ -171,12 +161,17 @@ impl Ids {
                 self.window.clear();
                 self.counter = 0;
                 match std::fs::create_dir_all(Path::new("models")) {
-                    Ok(_) => {
-                        dataset::write_features_unsupervised(
-                            Path::new("models/train.csv"),
-                            &dataset,
-                        )
-                        .expect("Could not save train features");
+                    Ok(()) => {
+                        match std::fs::create_dir_all(Path::new("features")) {
+                            Ok(()) => {
+                                dataset::write_features_unsupervised(
+                                    Path::new("features/train.csv"),
+                                    &dataset,
+                                )
+                                .expect("Could not save train features");
+                            }
+                            Err(why) => panic!("Could not create features directory: {}", why)
+                        }
                         if let Some(scaler) = scaler {
                             fs::write("models/scaler", bincode::serialize(&scaler).unwrap())
                                 .expect("Could not save scaler.");
@@ -216,17 +211,34 @@ impl Ids {
             }
         }
         let duration = start.elapsed().as_secs_f32();
-
-        match dataset::write_features(
-            Path::new("models/test.csv"),
-            &Dataset::new(
-                Array2::from(features),
-                Array1::from(predictions.iter().map(|p| p.1).collect::<Vec<bool>>()),
-            )
-            .with_feature_names(vec!["AvgTime", "Entropy", "HammingDist", "Label"]),
-        ) {
-            Ok(_) => (),
-            Err(why) => println!("Could not save test features: {}", why),
+        match std::fs::create_dir_all(Path::new("features")) {
+            Ok(()) => {
+                match dataset::write_features(
+                    Path::new("features/test.csv"),
+                    &Dataset::new(
+                        Array2::from(features),
+                        Array1::from(predictions.iter().zip(real.iter()).map(|(p, r)| {
+                        if *r {
+                            if p.1 {
+                                0
+                            } else {
+                                3
+                            }
+                        } else {
+                            if p.1 {
+                                2
+                            } else {
+                                1
+                            }
+                        }}).collect::<Vec<u8>>()),
+                    )
+                    .with_feature_names(vec!["AvgTime", "Entropy", "HammingDist", "Label"]),
+                ) {
+                    Ok(_) => (),
+                    Err(why) => println!("Could not save test features: {}", why),
+                }
+            }
+            Err(why) => panic!("Could not create features directory: {}", why)
         }
 
         (real, predictions, n_packets as f32 / duration)
