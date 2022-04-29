@@ -5,6 +5,7 @@ mod server;
 use chrono::Utc;
 use clap::Parser;
 use linfa::prelude::*;
+use serde::Deserialize;
 use model::{svm, Ids, Packet};
 use std::{
     fs::{self, File},
@@ -45,8 +46,11 @@ struct Args {
     live: bool,
 }
 
-const WINDOW_SIZE: usize = 500;
-const WINDOW_SLIDE: u16 = (WINDOW_SIZE as f64 * 0.25) as u16;
+#[derive(Deserialize)]
+struct Config {
+    window_size: usize,
+    window_slide: u16
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -66,6 +70,14 @@ async fn main() -> Result<(), Error> {
         100000
     };
 
+    let config: Config = match fs::read_to_string("config.toml") {
+        Ok(file) => match toml::from_str(&file) {
+            Ok(config) => config,
+            Err(why) => panic!("Could not deserialize config file: {}", why)
+        }
+        Err(why) => panic!("Could not read config file: {}", why)
+    };
+
     if let Some(paths) = args.extract_features {
         if let Some(modelpath) = args.model {
             let paths = paths.split(',').collect::<Vec<&str>>();
@@ -75,8 +87,8 @@ async fn main() -> Result<(), Error> {
             let mut ids = Ids::new(
                 Some(model),
                 Some(scaler),
-                WINDOW_SIZE,
-                WINDOW_SLIDE,
+                config.window_size,
+                config.window_slide,
                 monitor,
             );
             println!("Loaded model from {}", modelpath);
@@ -104,13 +116,13 @@ async fn main() -> Result<(), Error> {
             ids = Ids::new(
                 Some(model),
                 Some(scaler),
-                WINDOW_SIZE,
-                WINDOW_SLIDE,
+                config.window_size,
+                config.window_slide,
                 monitor,
             );
             println!("Loaded model from {}", modelpath);
         } else {
-            ids = Ids::new(None, None, WINDOW_SIZE, WINDOW_SLIDE, monitor);
+            ids = Ids::new(None, None, config.window_size, config.window_slide, monitor);
             ids.train(Some(&socket), None, baseline_size);
             println!("Training complete");
         }
@@ -188,7 +200,7 @@ async fn main() -> Result<(), Error> {
             if let Some(paths) = args.train {
                 let train_paths: Vec<&str> = paths.split(',').collect();
                 let train_paths: Vec<&Path> = train_paths.iter().map(Path::new).collect();
-                let mut ids = Ids::new(None, None, WINDOW_SIZE, WINDOW_SLIDE, monitor);
+                let mut ids = Ids::new(None, None, config.window_size, config.window_slide, monitor);
                 ids.train(None, Some(train_paths), baseline_size);
                 if let Some(paths) = args.test {
                     let test_paths: Vec<&str> = paths.split(',').collect();
@@ -233,7 +245,7 @@ async fn main() -> Result<(), Error> {
         } else if let Some(paths) = args.train {
             let train_paths: Vec<&str> = paths.split(',').collect();
             let train_paths: Vec<&Path> = train_paths.iter().map(Path::new).collect();
-            let mut ids = Ids::new(None, None, WINDOW_SIZE, WINDOW_SLIDE, monitor);
+            let mut ids = Ids::new(None, None, config.window_size, config.window_slide, monitor);
             ids.train(None, Some(train_paths), baseline_size);
             if let Some(paths) = args.test {
                 let test_paths: Vec<&str> = paths.split(',').collect();
@@ -284,8 +296,8 @@ async fn main() -> Result<(), Error> {
                                 let mut ids = Ids::new(
                                     Some(model),
                                     Some(scaler),
-                                    WINDOW_SIZE,
-                                    WINDOW_SLIDE,
+                                    config.window_size,
+                                    config.window_slide,
                                     monitor,
                                 );
                                 for packet in packets {
@@ -324,8 +336,8 @@ async fn main() -> Result<(), Error> {
                         let mut ids = Ids::new(
                             Some(model),
                             Some(scaler),
-                            WINDOW_SIZE,
-                            WINDOW_SLIDE,
+                            config.window_size,
+                            config.window_slide,
                             monitor,
                         );
                         loop {
@@ -376,8 +388,8 @@ async fn main() -> Result<(), Error> {
                             let (real, pred, speed) = Ids::new(
                                 Some(model),
                                 Some(scaler),
-                                WINDOW_SIZE,
-                                WINDOW_SLIDE,
+                                config.window_size,
+                                config.window_slide,
                                 monitor,
                             )
                             .test(packets);

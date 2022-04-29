@@ -48,7 +48,7 @@ pub fn write_features_unsupervised(
     Ok(())
 }
 
-pub fn normalize (
+pub fn normalize(
     dataset: &mut Dataset<f64, ()>,
     params: &Option<Vec<(f64, f64)>>,
 ) -> Option<Vec<(f64, f64)>> {
@@ -110,7 +110,12 @@ pub fn packets_from_csv(paths: Vec<&Path>) -> Result<Vec<model::Packet>, csv::Er
             for (i, item) in bytes.iter_mut().enumerate().take(dlc as usize) {
                 *item = match u8::from_str_radix(fields.get(i + 3).unwrap(), 16) {
                     Ok(digit) => digit,
-                    Err(why) => panic!("Could not parse {} at {:?}: {}", fields.get(i + 3).unwrap(), fields, why),
+                    Err(why) => panic!(
+                        "Could not parse {} at {:?}: {}",
+                        fields.get(i + 3).unwrap(),
+                        fields,
+                        why
+                    ),
                 }
             }
 

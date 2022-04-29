@@ -170,7 +170,7 @@ impl Ids {
                                 )
                                 .expect("Could not save train features");
                             }
-                            Err(why) => panic!("Could not create features directory: {}", why)
+                            Err(why) => panic!("Could not create features directory: {}", why),
                         }
                         if let Some(scaler) = scaler {
                             fs::write("models/scaler", bincode::serialize(&scaler).unwrap())
@@ -217,28 +217,38 @@ impl Ids {
                     Path::new("features/test.csv"),
                     &Dataset::new(
                         Array2::from(features),
-                        Array1::from(predictions.iter().zip(real.iter()).map(|(p, r)| {
-                        if *r {
-                            if p.1 {
-                                0
-                            } else {
-                                3
-                            }
-                        } else {
-                            if p.1 {
-                                2
-                            } else {
-                                1
-                            }
-                        }}).collect::<Vec<u8>>()),
+                        Array1::from(
+                            predictions
+                                .iter()
+                                .zip(real.iter())
+                                .map(|(p, r)| {
+                                    if *r {
+                                        if p.1 {
+                                            0
+                                        } else {
+                                            3
+                                        }
+                                    } else if p.1 {
+                                        2
+                                    } else {
+                                        1
+                                    }
+                                })
+                                .collect::<Vec<u8>>(),
+                        ),
                     )
-                    .with_feature_names(vec!["AvgTime", "Entropy", "HammingDist", "Label"]),
+                    .with_feature_names(vec![
+                        "AvgTime",
+                        "Entropy",
+                        "HammingDist",
+                        "Label",
+                    ]),
                 ) {
                     Ok(_) => (),
                     Err(why) => println!("Could not save test features: {}", why),
                 }
             }
-            Err(why) => panic!("Could not create features directory: {}", why)
+            Err(why) => panic!("Could not create features directory: {}", why),
         }
 
         (real, predictions, n_packets as f32 / duration)

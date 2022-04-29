@@ -12,8 +12,9 @@ linfa-svm = {version = "0", features = ["serde"]}
 ndarray = "0"
 ndarray-stats = "0"
 bincode = "1"
-serde = "1"
+serde = { version = "1", features = ["derive"] }
 reqwest = { version = "0", features = ["json"] }
 tokio = { version = "1", features = ["full"] }
 socketcan = "1"
 chrono = "0"
+toml = "0"
