@@ -1,6 +1,5 @@
 import argparse
 from pathlib import Path
-from xmlrpc.client import Boolean
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import figure
