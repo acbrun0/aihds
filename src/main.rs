@@ -5,8 +5,8 @@ mod server;
 use chrono::Utc;
 use clap::Parser;
 use linfa::prelude::*;
+use model::{Ids, Packet};
 use serde::Deserialize;
-use model::{svm, Ids, Packet};
 use std::{
     fs::{self, File},
     io::{self, Write},
@@ -48,49 +48,48 @@ struct Args {
 
 #[derive(Deserialize)]
 struct Config {
-    window_size: usize,
-    window_slide: u16
+    window: Window,
+}
+
+#[derive(Deserialize)]
+struct Window {
+    size: usize,
+    slide: u16,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     let args = Args::parse();
-    let monitor: Option<Vec<u32>> = args.monitor.map(|monitor| {
+    let mut monitor: Option<Vec<u32>> = args.monitor.map(|monitor| {
         monitor
             .split(',')
             .collect::<Vec<&str>>()
             .iter()
             .map(|s| u32::from_str_radix(*s, 16).unwrap())
-            .collect()
+            .collect::<Vec<u32>>()
     });
-
-    let baseline_size: usize = if monitor.is_some() {
-        monitor.clone().unwrap().len() * 100
+    let baseline_size = if let Some(ref mut monitor) = monitor {
+        monitor.sort_unstable();
+        monitor.dedup();
+        println!("Monitoring {} IDs", monitor.len());
+        monitor.len() * 500
     } else {
-        100000
+        1000000
     };
 
     let config: Config = match fs::read_to_string("config.toml") {
         Ok(file) => match toml::from_str(&file) {
             Ok(config) => config,
-            Err(why) => panic!("Could not deserialize config file: {}", why)
-        }
-        Err(why) => panic!("Could not read config file: {}", why)
+            Err(why) => panic!("Could not deserialize config file: {}", why),
+        },
+        Err(why) => panic!("Could not read config file: {}", why),
     };
 
     if let Some(paths) = args.extract_features {
         if let Some(modelpath) = args.model {
             let paths = paths.split(',').collect::<Vec<&str>>();
             let paths = paths.iter().map(Path::new).collect();
-            let model = svm::load(Path::new(&modelpath)).expect("Could not load model");
-            let scaler = bincode::deserialize(&fs::read("models/scaler").unwrap()).unwrap();
-            let mut ids = Ids::new(
-                Some(model),
-                Some(scaler),
-                config.window_size,
-                config.window_slide,
-                monitor,
-            );
+            let mut ids = Ids::load(Path::new(&modelpath));
             println!("Loaded model from {}", modelpath);
             match dataset::packets_from_csv(paths) {
                 Ok(packets) => {
@@ -111,18 +110,10 @@ async fn main() -> Result<(), Error> {
         let mut last_attack = time::Instant::now();
 
         if let Some(modelpath) = args.model {
-            let model = svm::load(Path::new(&modelpath)).expect("Could not load model");
-            let scaler = bincode::deserialize(&fs::read("models/scaler").unwrap()).unwrap();
-            ids = Ids::new(
-                Some(model),
-                Some(scaler),
-                config.window_size,
-                config.window_slide,
-                monitor,
-            );
+            ids = Ids::load(Path::new(&modelpath));
             println!("Loaded model from {}", modelpath);
         } else {
-            ids = Ids::new(None, None, config.window_size, config.window_slide, monitor);
+            ids = Ids::new(None, None, config.window.size, config.window.slide, monitor);
             ids.train(Some(&socket), None, baseline_size);
             println!("Training complete");
         }
@@ -200,7 +191,8 @@ async fn main() -> Result<(), Error> {
             if let Some(paths) = args.train {
                 let train_paths: Vec<&str> = paths.split(',').collect();
                 let train_paths: Vec<&Path> = train_paths.iter().map(Path::new).collect();
-                let mut ids = Ids::new(None, None, config.window_size, config.window_slide, monitor);
+                let mut ids =
+                    Ids::new(None, None, config.window.size, config.window.slide, monitor);
                 ids.train(None, Some(train_paths), baseline_size);
                 if let Some(paths) = args.test {
                     let test_paths: Vec<&str> = paths.split(',').collect();
@@ -245,7 +237,7 @@ async fn main() -> Result<(), Error> {
         } else if let Some(paths) = args.train {
             let train_paths: Vec<&str> = paths.split(',').collect();
             let train_paths: Vec<&Path> = train_paths.iter().map(Path::new).collect();
-            let mut ids = Ids::new(None, None, config.window_size, config.window_slide, monitor);
+            let mut ids = Ids::new(None, None, config.window.size, config.window.slide, monitor);
             ids.train(None, Some(train_paths), baseline_size);
             if let Some(paths) = args.test {
                 let test_paths: Vec<&str> = paths.split(',').collect();
@@ -254,24 +246,37 @@ async fn main() -> Result<(), Error> {
                     Ok(packets) => {
                         let (real, pred, speed) = ids.test(packets);
                         let pred: Vec<bool> = pred.into_iter().map(|p| p.1).collect();
-                        let mut tp = 0;
-                        let mut fp = 0;
-                        let mut tn = 0;
-                        let mut fal_n = 0;
+                        let mut tp: f64 = 0.0;
+                        let mut fp: f64 = 0.0;
+                        let mut tn: f64 = 0.0;
+                        let mut fal_n: f64 = 0.0;
                         for (r, p) in real.iter().zip(pred.iter()) {
                             if *r {
                                 if *p {
-                                    tp += 1;
+                                    tp += 1.0;
                                 } else {
-                                    fal_n += 1;
+                                    fal_n += 1.0;
                                 }
                             } else if *p {
-                                fp += 1;
+                                fp += 1.0;
                             } else {
-                                tn += 1;
+                                tn += 1.0;
                             }
                         }
-                        println!("True positives: {}\nTrue negatives: {}\nFalse positives: {}\nFalse negatives: {}", tp, tn, fp, fal_n);
+                        let precision = tp / (tp + fp);
+                        let recall = tp / (tp + fal_n);
+                        println!("True positives: {}\nTrue negatives: {}\nFalse positives: {}\nFalse negatives: {}\n", tp, tn, fp, fal_n);
+                        println!("False negative rate: {:.3}%", fal_n / (tp + fal_n) * 100.0);
+                        println!(
+                            "Error rate: {:.3}%",
+                            (fp + fal_n) / (tp + tn + fp + fal_n) * 100.0
+                        );
+                        println!("Precision: {:.3}%", precision * 100.0);
+                        println!("Recall: {:.3}%", recall * 100.0);
+                        println!(
+                            "F1-score: {:.3}%\n",
+                            2.0 * (precision * recall) / (precision + recall) * 100.0
+                        );
                         println!("Average packets/s: {}", speed);
                     }
                     Err(why) => panic!("Could not load test datasets: {}", why),
@@ -280,145 +285,127 @@ async fn main() -> Result<(), Error> {
         }
     } else {
         // Load model
-        println!("Loading model...");
         let modelpath = args.model.unwrap();
-        match svm::load(Path::new(&modelpath)) {
-            Ok(model) => {
-                if let Some(url) = args.streaming {
-                    if let Some(paths) = args.test {
-                        let test_paths: Vec<&str> = paths.split(',').collect();
-                        let test_paths: Vec<&Path> = test_paths.iter().map(Path::new).collect();
-                        let scaler =
-                            bincode::deserialize(&fs::read("models/scaler").unwrap()).unwrap();
-                        match dataset::packets_from_csv(test_paths) {
-                            Ok(packets) => {
-                                let client = reqwest::Client::new();
-                                let mut ids = Ids::new(
-                                    Some(model),
-                                    Some(scaler),
-                                    config.window_size,
-                                    config.window_slide,
-                                    monitor,
-                                );
-                                for packet in packets {
-                                    if let Some(result) = ids.push(packet) {
-                                        match server::post(
-                                            &client,
-                                            &url,
-                                            result.0.to_vec().iter().map(|v| *v as f32).collect(),
-                                            &result.1,
-                                            if result.1 {
-                                                Some(format!(
-                                                    "Found attack inside window [{}, {}]",
-                                                    result.2 .0, result.2 .1
-                                                ))
-                                            } else {
-                                                None
-                                            },
-                                        )
-                                        .await
-                                        {
-                                            Ok(_) => (),
-                                            Err(why) => {
-                                                panic!("Could not communicate with server: {}", why)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            Err(why) => panic!("Could not load test dataset: {}", why),
-                        }
-                    } else {
-                        let socket = server::open_socket("can0", &monitor);
+        if let Some(url) = args.streaming {
+            if let Some(paths) = args.test {
+                let test_paths: Vec<&str> = paths.split(',').collect();
+                let test_paths: Vec<&Path> = test_paths.iter().map(Path::new).collect();
+                match dataset::packets_from_csv(test_paths) {
+                    Ok(packets) => {
                         let client = reqwest::Client::new();
-                        let scaler =
-                            bincode::deserialize(&fs::read("models/scaler").unwrap()).unwrap();
-                        let mut ids = Ids::new(
-                            Some(model),
-                            Some(scaler),
-                            config.window_size,
-                            config.window_slide,
-                            monitor,
-                        );
-                        loop {
-                            match socket.read_frame() {
-                                Ok(frame) => {
-                                    if let Some(result) = ids.push(Packet::new(
-                                        Utc::now().naive_local().timestamp_millis(),
-                                        frame.id(),
-                                        frame.data().to_vec(),
-                                        false,
-                                    )) {
-                                        match server::post(
-                                            &client,
-                                            &url,
-                                            result.0.iter().map(|f| *f as f32).collect(),
-                                            &result.1,
-                                            if result.1 {
-                                                Some(format!(
-                                                    "Found attack inside window [{}, {}]",
-                                                    result.2 .0, result.2 .1
-                                                ))
-                                            } else {
-                                                None
-                                            },
-                                        )
-                                        .await
-                                        {
-                                            Ok(_) => (),
-                                            Err(why) => {
-                                                println!(
-                                                    "Could not communicate with server: {}",
-                                                    why
-                                                )
-                                            }
-                                        }
+                        println!("Loading model...");
+                        let mut ids = Ids::load(Path::new(&modelpath));
+                        for packet in packets {
+                            if let Some(result) = ids.push(packet) {
+                                match server::post(
+                                    &client,
+                                    &url,
+                                    result.0.to_vec().iter().map(|v| *v as f32).collect(),
+                                    &result.1,
+                                    if result.1 {
+                                        Some(format!(
+                                            "Found attack inside window [{}, {}]",
+                                            result.2 .0, result.2 .1
+                                        ))
+                                    } else {
+                                        None
+                                    },
+                                )
+                                .await
+                                {
+                                    Ok(_) => (),
+                                    Err(why) => {
+                                        panic!("Could not communicate with server: {}", why)
                                     }
                                 }
-                                Err(why) => panic!("Could not read frame: {}", why),
                             }
                         }
                     }
-                } else if let Some(paths) = args.test {
-                    let test_paths: Vec<&str> = paths.split(',').collect();
-                    let test_paths: Vec<&Path> = test_paths.iter().map(Path::new).collect();
-                    let scaler = bincode::deserialize(&fs::read("models/scaler").unwrap()).unwrap();
-                    match dataset::packets_from_csv(test_paths) {
-                        Ok(packets) => {
-                            let (real, pred, speed) = Ids::new(
-                                Some(model),
-                                Some(scaler),
-                                config.window_size,
-                                config.window_slide,
-                                monitor,
-                            )
-                            .test(packets);
-                            let pred: Vec<bool> = pred.into_iter().map(|p| p.1).collect();
-                            let mut tp = 0;
-                            let mut fp = 0;
-                            let mut tn = 0;
-                            let mut fal_n = 0;
-                            for (r, p) in real.iter().zip(pred.iter()) {
-                                if *r {
-                                    if *p {
-                                        tp += 1;
+                    Err(why) => panic!("Could not load test dataset: {}", why),
+                }
+            } else {
+                let socket = server::open_socket("can0", &monitor);
+                let client = reqwest::Client::new();
+                let mut ids = Ids::load(Path::new(&modelpath));
+                loop {
+                    match socket.read_frame() {
+                        Ok(frame) => {
+                            if let Some(result) = ids.push(Packet::new(
+                                Utc::now().naive_local().timestamp_millis(),
+                                frame.id(),
+                                frame.data().to_vec(),
+                                false,
+                            )) {
+                                match server::post(
+                                    &client,
+                                    &url,
+                                    result.0.iter().map(|f| *f as f32).collect(),
+                                    &result.1,
+                                    if result.1 {
+                                        Some(format!(
+                                            "Found attack inside window [{}, {}]",
+                                            result.2 .0, result.2 .1
+                                        ))
                                     } else {
-                                        fal_n += 1;
+                                        None
+                                    },
+                                )
+                                .await
+                                {
+                                    Ok(_) => (),
+                                    Err(why) => {
+                                        println!("Could not communicate with server: {}", why)
                                     }
-                                } else if *p {
-                                    fp += 1;
-                                } else {
-                                    tn += 1;
                                 }
                             }
-                            println!("True positives: {}\nTrue negatives: {}\nFalse positives: {}\nFalse negatives: {}", tp, tn, fp, fal_n);
-                            println!("Average packets/s: {}", speed);
                         }
-                        Err(why) => panic!("Could not load test datasets: {}", why),
+                        Err(why) => panic!("Could not read frame: {}", why),
                     }
                 }
             }
-            Err(why) => panic!("Could not load model: {}", why),
+        } else if let Some(paths) = args.test {
+            let test_paths: Vec<&str> = paths.split(',').collect();
+            let test_paths: Vec<&Path> = test_paths.iter().map(Path::new).collect();
+            match dataset::packets_from_csv(test_paths) {
+                Ok(packets) => {
+                    let mut ids = Ids::load(Path::new(&modelpath));
+                    let (real, pred, speed) = ids.test(packets);
+                    let pred: Vec<bool> = pred.into_iter().map(|p| p.1).collect();
+                    let mut tp: f64 = 0.0;
+                    let mut fp: f64 = 0.0;
+                    let mut tn: f64 = 0.0;
+                    let mut fal_n: f64 = 0.0;
+                    for (r, p) in real.iter().zip(pred.iter()) {
+                        if *r {
+                            if *p {
+                                tp += 1.0;
+                            } else {
+                                fal_n += 1.0;
+                            }
+                        } else if *p {
+                            fp += 1.0;
+                        } else {
+                            tn += 1.0;
+                        }
+                    }
+                    let precision = tp / (tp + fp);
+                    let recall = tp / (tp + fal_n);
+                    println!("True positives: {}\nTrue negatives: {}\nFalse positives: {}\nFalse negatives: {}\n", tp, tn, fp, fal_n);
+                    println!("False negative rate: {:.3}%", fal_n / (tp + fal_n) * 100.0);
+                    println!(
+                        "Error rate: {:.3}%",
+                        (fp + fal_n) / (tp + tn + fp + fal_n) * 100.0
+                    );
+                    println!("Precision: {:.3}%", precision * 100.0);
+                    println!("Recall: {:.3}%", recall * 100.0);
+                    println!(
+                        "F1-score: {:.3}%\n",
+                        2.0 * (precision * recall) / (precision + recall) * 100.0
+                    );
+                    println!("Average packets/s: {}", speed);
+                }
+                Err(why) => panic!("Could not load test datasets: {}", why),
+            }
         }
     }
     Ok(())
