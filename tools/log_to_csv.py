@@ -23,6 +23,7 @@ def main():
         for _ in range(8):
             content = re.sub(f"(?<=,[0-9A-Z]{{2}},[0-9A-Z]{{2}})(?=[^,\n])", ',', content, flags=re.M)
         content = re.sub('\n', ",Normal\n", content, flags=re.M)
+        content = re.sub(",,", ",", content, flags=re.M)
         with open("datasets/replaced.csv", "w") as out:
             out.write("timestamp,id,dlc,data0,data1,data2,data3,data4,data5,data6,data7,label\n" + content)
 
