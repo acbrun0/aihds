@@ -1,11 +1,11 @@
 mod dataset;
-mod model;
+mod ids;
 mod server;
 
 use chrono::Utc;
 use clap::Parser;
+use ids::{Ids, Packet};
 use linfa::prelude::*;
-use model::{Ids, Packet};
 use serde::Deserialize;
 use std::{
     fs::{self, File},

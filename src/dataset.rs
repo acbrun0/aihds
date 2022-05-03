@@ -1,4 +1,4 @@
-use crate::model;
+use crate::ids;
 use csv::{StringRecord, Writer};
 use linfa::dataset::Dataset;
 use ndarray_stats::QuantileExt;
@@ -71,7 +71,7 @@ pub fn normalize(
     }
 }
 
-pub fn packets_from_csv(paths: Vec<&Path>) -> Result<Vec<model::Packet>, csv::Error> {
+pub fn packets_from_csv(paths: Vec<&Path>) -> Result<Vec<ids::Packet>, csv::Error> {
     let mut packets = Vec::new();
     for path in paths {
         println!("Loading packets from {}", path.display());
@@ -127,7 +127,7 @@ pub fn packets_from_csv(paths: Vec<&Path>) -> Result<Vec<model::Packet>, csv::Er
                 }
             };
 
-            packets.push(model::Packet::new(timestamp, id, bytes.to_vec(), flag));
+            packets.push(ids::Packet::new(timestamp, id, bytes.to_vec(), flag));
         }
     }
     Ok(packets)
