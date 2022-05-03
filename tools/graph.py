@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import figure
+from matplotlib.lines import Line2D
 import numpy as np
 
 def label_to_color(label):
@@ -35,19 +36,25 @@ def main():
             plt.savefig(f"graphs/{Path(path).stem}.png")
         for col in dataset:
             if col != "Label":
-                figure(figsize=(15, 5))
-                plt.xlabel("Window")
-                plt.scatter(np.arange(0, len(dataset[col])), dataset[col], c=dataset["Label"].apply(label_to_color).values if "Label" in dataset else "c")
+                fig, ax = plt.subplots()
+                fig.set_size_inches(20, 5)
+                ax.set_xlabel("Window")
+                ax.scatter(np.arange(0, len(dataset[col])), dataset[col], c=dataset["Label"].apply(label_to_color).values if "Label" in dataset else "c")
                 if col == "AvgTime":
-                    plt.ylabel("Average Time")
-                    plt.title("Average Time Between Packets of the Same ID")
+                    ax.set_ylabel("Average Time")
+                    ax.set_title("Average Time Between Packets of the Same ID")
                 elif col == "Entropy":
-                    plt.ylabel(col)
-                    plt.title("Average Entropy of Packets of the Same ID")
+                    ax.set_ylabel(col)
+                    ax.set_title("Average Entropy of Packets of the Same ID")
                 elif col == "HammingDist":
-                    plt.ylabel("Hamming Distance")
-                    plt.title("Average Hamming Distance of Packets of the Same ID")
-                plt.savefig(f"graphs/{Path(path).stem}/{col}.png")
+                    ax.set_ylabel("Hamming Distance")
+                    ax.set_title("Average Hamming Distance of Packets of the Same ID")
+                legend_elements = [Line2D([0], [0], marker='o', color='w', label='True positive', markerfacecolor='g', markersize=15),
+                                   Line2D([0], [0], marker='o', color='w', label='True negative', markerfacecolor='b', markersize=15),
+                                   Line2D([0], [0], marker='o', color='w', label='False positive', markerfacecolor='y', markersize=15),
+                                   Line2D([0], [0], marker='o', color='w', label='False negative', markerfacecolor='r', markersize=15)]
+                ax.legend(handles=legend_elements)
+                fig.savefig(f"graphs/{Path(path).stem}/{col}.png")
 
 
 if __name__ == "__main__":
