@@ -1,0 +1,3 @@
+[submodule "tools/can-log-infector"]
+	path = tools/can-log-infector
+	url = https://github.com/CrySyS/can-log-infector.git
