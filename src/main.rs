@@ -7,6 +7,7 @@ use clap::Parser;
 use ids::{Ids, Packet};
 use linfa::prelude::*;
 use serde::Deserialize;
+use csv::Writer;
 use std::{
     fs::{self, File},
     io::{self, Write},
@@ -93,7 +94,24 @@ async fn main() -> Result<(), Error> {
             println!("Loaded model from {}", modelpath);
             match dataset::packets_from_csv(paths) {
                 Ok(packets) => {
-                    ids.test(packets);
+                    let dataset = ids.feature_file(packets);
+                    let mut wtr = Writer::from_path(Path::new("features/extracted.csv")).unwrap();
+                    match wtr.write_record(dataset.feature_names()) {
+                        Ok(()) => {
+                            for (record, target) in dataset.records.outer_iter().zip(dataset.targets.clone()) {
+                                wtr.write_record(&[
+                                    record[0].to_string(),
+                                    record[1].to_string(),
+                                    record[2].to_string(),
+                                    record[3].to_string(),
+                                    record[4].to_string(),
+                                    target.to_string(),
+                                ]).unwrap();
+                            }
+                            wtr.flush().unwrap();
+                    }
+                    Err(why) => panic!("Could not write to {}: {}", Path::new("features/extracted.csv").display(), why),
+    }
                     return Ok(());
                 }
                 Err(why) => panic!("Could not load dataset: {}", why),

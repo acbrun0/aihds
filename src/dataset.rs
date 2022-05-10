@@ -13,12 +13,9 @@ pub fn write_features(path: &Path, dataset: &Dataset<f64, u8>) -> Result<(), csv
     match wtr.write_record(dataset.feature_names()) {
         Ok(()) => {
             for (record, target) in dataset.records.outer_iter().zip(dataset.targets.clone()) {
-                wtr.write_record(&[
-                    record[0].to_string(),
-                    record[1].to_string(),
-                    record[2].to_string(),
-                    target.to_string(),
-                ])?;
+                let mut line: Vec<String> = record.iter().map(|r| r.to_string()).collect();
+                line.push(target.to_string());
+                wtr.write_record(line)?;
             }
             wtr.flush()?;
         }
@@ -35,11 +32,7 @@ pub fn write_features_unsupervised(
     match wtr.write_record(dataset.feature_names()) {
         Ok(()) => {
             for record in dataset.records.outer_iter() {
-                wtr.write_record(&[
-                    record[0].to_string(),
-                    record[1].to_string(),
-                    record[2].to_string(),
-                ])?;
+                wtr.write_record(record.iter().map(|r| r.to_string()))?;
             }
             wtr.flush()?;
         }
