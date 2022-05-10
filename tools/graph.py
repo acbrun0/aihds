@@ -2,7 +2,6 @@ import argparse
 from pathlib import Path
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.pyplot import figure
 from matplotlib.lines import Line2D
 import numpy as np
 
@@ -49,11 +48,12 @@ def main():
                 elif col == "HammingDist":
                     ax.set_ylabel("Hamming Distance")
                     ax.set_title("Average Hamming Distance of Packets of the Same ID")
-                legend_elements = [Line2D([0], [0], marker='o', color='w', label='True positive', markerfacecolor='g', markersize=15),
-                                   Line2D([0], [0], marker='o', color='w', label='True negative', markerfacecolor='b', markersize=15),
-                                   Line2D([0], [0], marker='o', color='w', label='False positive', markerfacecolor='y', markersize=15),
-                                   Line2D([0], [0], marker='o', color='w', label='False negative', markerfacecolor='r', markersize=15)]
-                ax.legend(handles=legend_elements)
+                if "Label" in dataset:
+                    legend_elements = [Line2D([0], [0], marker='o', color='w', label='True positive', markerfacecolor='g', markersize=15),
+                                    Line2D([0], [0], marker='o', color='w', label='True negative', markerfacecolor='b', markersize=15),
+                                    Line2D([0], [0], marker='o', color='w', label='False positive', markerfacecolor='y', markersize=15),
+                                    Line2D([0], [0], marker='o', color='w', label='False negative', markerfacecolor='r', markersize=15)]
+                    ax.legend(handles=legend_elements)
                 fig.savefig(f"graphs/{Path(path).stem}/{col}.png")
 
 
