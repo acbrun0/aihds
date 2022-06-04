@@ -45,7 +45,7 @@ def main():
                 elif col == "Entropy":
                     ax.set_ylabel(col)
                     ax.set_title("Average Entropy of Packets of the Same ID")
-                elif col == "HammingDist":
+                elif col == "HammingDistBytes":
                     ax.set_ylabel("Hamming Distance")
                     ax.set_title("Average Hamming Distance of Packets of the Same ID")
                 if "Label" in dataset:
