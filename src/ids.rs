@@ -14,7 +14,7 @@ use std::{
     time::Instant,
 };
 
-pub type Features = [f64; 5];
+pub type Features = [f64; 3];
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Packet {
@@ -152,8 +152,8 @@ impl Ids {
         }
 
         let mut dataset = Dataset::new(Array2::from(features), Array1::from(labels))
-            .with_feature_names(vec!["AvgTime", "Entropy", "HammingDist", "HammingDistBytes", "GapBytes"]);
-            // .with_feature_names(vec!["AvgTime", "HammingDistBytes", "GapBytes"]);
+            // .with_feature_names(vec!["AvgTime", "Entropy", "HammingDist", "HammingDistBytes", "GapBytes"]);
+            .with_feature_names(vec!["AvgTime", "Entropy", "HammingDist"]);
         let scaler = dataset::normalize(&mut dataset, &None);
 
         match Svm::<f64, _>::params()
@@ -213,8 +213,8 @@ impl Ids {
             "AvgTime",
             "Entropy",
             "HammingDist",
-            "HammingDistBytes",
-            "GapBytes",
+            // "HammingDistBytes",
+            // "GapBytes",
             "Label"
         ])
     }
@@ -273,8 +273,8 @@ impl Ids {
                         "AvgTime",
                         "Entropy",
                         "HammingDist",
-                        "HammingDistBytes",
-                        "GapBytes",
+                        // "HammingDistBytes",
+                        // "GapBytes",
                         "Label",
                     ]),
                 ) {
@@ -348,9 +348,9 @@ impl Ids {
         let mut feat = HashMap::new();
         let mut avg_time = Vec::new();
         let mut entropy = Vec::new();
-        let mut hamming: Vec<f64> = Vec::new();
+        // let mut hamming: Vec<f64> = Vec::new();
         let mut hamming_bytes = Vec::new();
-        let mut diff_bytes = Vec::new();
+        // let mut diff_bytes = Vec::new();
 
         for p in &self.window {
             let val = feat.entry(&p.id).or_insert((Vec::new(), Vec::new()));
@@ -374,34 +374,34 @@ impl Ids {
                 });
 
                 if val.1.len() > 1 {
-                    // Calculate average Hamming distance
-                    hamming.push(
-                        val.1
-                            .windows(2)
-                            .map(|b| {
-                                let mut count: i16 = 0;
-                                let bitstring0 =
-                                    b[0].iter().fold(String::new(), |mut string, b| {
-                                        string.push_str(format!("{:08b}", b).as_str());
-                                        string
-                                    });
-                                let bitstring1 =
-                                    b[1].iter().fold(String::new(), |mut string, b| {
-                                        string.push_str(format!("{:08b}", b).as_str());
-                                        string
-                                    });
-                                for (b0, b1) in bitstring0.chars().zip(bitstring1.chars()) {
-                                    if b0 != b1 {
-                                        count += 1;
-                                    }
-                                }
-                                count
-                            })
-                            .collect::<Vec<i16>>()
-                            .iter()
-                            .sum::<i16>() as f64
-                            / (val.1.len()) as f64,
-                    );
+                    // // Calculate average Hamming distance
+                    // hamming.push(
+                    //     val.1
+                    //         .windows(2)
+                    //         .map(|b| {
+                    //             let mut count: i16 = 0;
+                    //             let bitstring0 =
+                    //                 b[0].iter().fold(String::new(), |mut string, b| {
+                    //                     string.push_str(format!("{:08b}", b).as_str());
+                    //                     string
+                    //                 });
+                    //             let bitstring1 =
+                    //                 b[1].iter().fold(String::new(), |mut string, b| {
+                    //                     string.push_str(format!("{:08b}", b).as_str());
+                    //                     string
+                    //                 });
+                    //             for (b0, b1) in bitstring0.chars().zip(bitstring1.chars()) {
+                    //                 if b0 != b1 {
+                    //                     count += 1;
+                    //                 }
+                    //             }
+                    //             count
+                    //         })
+                    //         .collect::<Vec<i16>>()
+                    //         .iter()
+                    //         .sum::<i16>() as f64
+                    //         / (val.1.len()) as f64,
+                    // );
                     // Calculate entropy
                     for i in 0..8 {
                         // Get ith byte from each ocurrence
@@ -438,31 +438,31 @@ impl Ids {
                             .sum::<i16>() as f64
                             / (val.1.len()) as f64,
                     );
-                    // Calculate gap between bytes
-                    diff_bytes.push(
-                        val.1
-                            .windows(2)
-                            .map(|b| {
-                                let mut gaps = Vec::new();
-                                for (b1, b2) in b[0].iter().zip(b[1]) {
-                                    gaps.push(*b2 as i16 - *b1 as i16);
-                                }
-                                gaps.iter().sum::<i16>() as f64 / gaps.len() as f64
-                            })
-                            .collect::<Vec<f64>>()
-                            .iter()
-                            .sum::<f64>()
-                            / (val.1.len()) as f64,
-                    );
+                    // // Calculate gap between bytes
+                    // diff_bytes.push(
+                    //     val.1
+                    //         .windows(2)
+                    //         .map(|b| {
+                    //             let mut gaps = Vec::new();
+                    //             for (b1, b2) in b[0].iter().zip(b[1]) {
+                    //                 gaps.push(*b2 as i16 - *b1 as i16);
+                    //             }
+                    //             gaps.iter().sum::<i16>() as f64 / gaps.len() as f64
+                    //         })
+                    //         .collect::<Vec<f64>>()
+                    //         .iter()
+                    //         .sum::<f64>()
+                    //         / (val.1.len()) as f64,
+                    // );
                 }
             }
 
             Some([
                 avg_time.iter().sum::<f64>() / avg_time.len() as f64,
                 entropy.iter().sum::<f64>() / entropy.len() as f64,
-                hamming.iter().sum::<f64>() / hamming.len() as f64,
+                // hamming.iter().sum::<f64>() / hamming.len() as f64,
                 hamming_bytes.iter().sum::<f64>() / hamming_bytes.len() as f64,
-                diff_bytes.iter().sum::<f64>() / diff_bytes.len() as f64,
+                // diff_bytes.iter().sum::<f64>() / diff_bytes.len() as f64,
             ])
         } else {
             None
