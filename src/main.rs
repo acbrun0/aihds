@@ -233,7 +233,7 @@ async fn main() -> Result<(), Error> {
                             for packet in packets {
                                 if let Some(result) = ids.push(packet) {
                                     // Sleep to allow chart animation to complete
-                                    thread::sleep(time::Duration::from_millis(50));
+                                    thread::sleep(time::Duration::from_millis(100));
                                     match server::post(
                                         &client,
                                         &url,
@@ -348,7 +348,10 @@ async fn main() -> Result<(), Error> {
                                 )
                                 .await
                                 {
-                                    Ok(_) => (),
+                                    Ok(_) => {
+                                        // Sleep to allow chart animation to complete
+                                        thread::sleep(time::Duration::from_millis(100))
+                                    }
                                     Err(why) => {
                                         panic!("Could not communicate with server: {}", why)
                                     }
