@@ -3,9 +3,9 @@ use chrono::Utc;
 use linfa::{prelude::*, DatasetBase};
 use linfa_svm::Svm;
 use ndarray::{Array1, Array2};
+use ndarray::{ArrayBase, Dim, OwnedRepr};
 use serde::{Deserialize, Serialize};
 use socketcan::CANSocket;
-use ndarray::{ArrayBase, OwnedRepr, Dim};
 use std::{
     collections::HashMap,
     fs,
@@ -193,7 +193,13 @@ impl Ids {
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn feature_file(&mut self, packets: Vec<Packet>) -> DatasetBase<ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>, ArrayBase<OwnedRepr<bool>, Dim<[usize; 2]>>>{
+    pub fn feature_file(
+        &mut self,
+        packets: Vec<Packet>,
+    ) -> DatasetBase<
+        ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
+        ArrayBase<OwnedRepr<bool>, Dim<[usize; 2]>>,
+    > {
         let mut features = Vec::new();
         let mut labels = Vec::new();
 
@@ -209,17 +215,13 @@ impl Ids {
             }
         }
 
-        Dataset::new(
-            Array2::from(features),
-            Array1::from(labels),
-        )
-        .with_feature_names(vec![
+        Dataset::new(Array2::from(features), Array1::from(labels)).with_feature_names(vec![
             "AvgTime",
             "Entropy",
             "HammingDist",
             // "HammingDistBytes",
             // "GapBytes",
-            "Label"
+            "Label",
         ])
     }
 
@@ -235,11 +237,6 @@ impl Ids {
 
         let start = Instant::now();
         for packet in packets {
-            if let Some(filter) = &self.monitor {
-                if !filter.contains(&packet.id) {
-                    continue;
-                }
-            }
             if let Some(result) = self.push(packet) {
                 features.push(result.0);
                 predictions.push(result);
@@ -293,6 +290,11 @@ impl Ids {
     }
 
     pub fn push(&mut self, packet: Packet) -> Option<(Features, bool, (i64, i64))> {
+        if let Some(filter) = &self.monitor {
+            if !filter.contains(&packet.id) {
+                return None;
+            }
+        }
         let mut prediction: Option<(Features, bool, (i64, i64))> = None;
         if self.window.len() < self.window.capacity() {
             self.window.push(packet);
@@ -301,21 +303,19 @@ impl Ids {
             self.window.push(packet);
             self.counter += 1;
             if self.counter == self.slide {
-                prediction = if let Some(pred) = self.predict() {
-                    Some((
+                if let Some(pred) = self.predict() {
+                    prediction = Some((
                         pred.0,
                         pred.1,
                         (
                             self.window[0].timestamp,
                             self.window[self.window.capacity() - 1].timestamp,
                         ),
-                    ))
-                } else {
-                    None
-                };
-                self.counter = 0;
+                    ));
+                    self.counter = 0;
+                }
             }
-        }
+        };
         prediction
     }
 
