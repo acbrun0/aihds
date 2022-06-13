@@ -52,7 +52,7 @@ function loadCharts() {
         }
     }
 
-    let chart = new Chart(document.getElementById('chart1').getContext('2d'), config)
+    let chart = new Chart(document.getElementById('chart').getContext('2d'), config)
     let log = document.getElementById('log')
     let alert = document.getElementById('alert')
 
