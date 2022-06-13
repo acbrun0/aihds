@@ -8,7 +8,6 @@ from matplotlib.pyplot import figure
 def main():
     parser = argparse.ArgumentParser(description="Generate plot from CSV data.")
     parser.add_argument("dataset", nargs="*", help="Path to CSV file.")
-    parser.add_argument("--threed", action='store_true', help="Make a 3d scatterplot.")
     args = parser.parse_args()
     Path("graphs").mkdir(exist_ok=True)
 
