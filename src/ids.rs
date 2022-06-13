@@ -72,6 +72,10 @@ impl Ids {
         ids
     }
 
+    pub fn get_monitor(&self) -> &Option<Vec<u32>> {
+        &self.monitor
+    }
+
     pub fn train(
         &mut self,
         socket: Option<&CANSocket>,

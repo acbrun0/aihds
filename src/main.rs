@@ -137,6 +137,11 @@ async fn main() -> Result<(), Error> {
         if let Some(modelpath) = args.model {
             ids = Ids::load(Path::new(&modelpath));
             println!("Loaded model from {}", modelpath);
+            if let Some(monitor) = ids.get_monitor() {
+                println!("Monitoring: {:X?}", monitor);
+            } else {
+                println!("Monitoring all IDs.");
+            }
         } else {
             ids = Ids::new(None, None, config.window.size, config.window.slide, monitor);
             ids.train(Some(&socket), None, baseline_size);
@@ -320,6 +325,11 @@ async fn main() -> Result<(), Error> {
                         let client = reqwest::Client::new();
                         println!("Loading model...");
                         let mut ids = Ids::load(Path::new(&modelpath));
+                        if let Some(monitor) = ids.get_monitor() {
+                            println!("Monitoring: {:X?}", monitor);
+                        } else {
+                            println!("Monitoring all IDs.");
+                        }
                         for packet in packets {
                             if let Some(result) = ids.push(packet) {
                                 match server::post(
@@ -352,6 +362,11 @@ async fn main() -> Result<(), Error> {
                 let socket = server::open_socket("can0", &monitor);
                 let client = reqwest::Client::new();
                 let mut ids = Ids::load(Path::new(&modelpath));
+                if let Some(monitor) = ids.get_monitor() {
+                    println!("Monitoring: {:X?}", monitor);
+                } else {
+                    println!("Monitoring all IDs.");
+                }
                 loop {
                     match socket.read_frame() {
                         Ok(frame) => {
@@ -394,6 +409,11 @@ async fn main() -> Result<(), Error> {
             match dataset::packets_from_csv(test_paths) {
                 Ok(packets) => {
                     let mut ids = Ids::load(Path::new(&modelpath));
+                    if let Some(monitor) = ids.get_monitor() {
+                        println!("Monitoring: {:X?}", monitor);
+                    } else {
+                        println!("Monitoring all IDs.");
+                    }
                     let (real, pred, speed) = ids.test(packets);
                     let pred: Vec<bool> = pred.into_iter().map(|p| p.1).collect();
                     let mut tp: f64 = 0.0;
