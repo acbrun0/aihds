@@ -155,19 +155,39 @@ async fn main() -> Result<(), Error> {
         };
         log.write_all(b"AvgTime,Entropy,HammingDist,Label\n")
             .expect("Unable to write to log");
+
+        let mut speed_file = match File::create("models/speed.log") {
+            Ok(file) => file,
+            Err(why) => panic!("Could not create log file: {}", why),
+        };
+        let mut n_packets = 0;
+        let mut start_time = time::Instant::now();
         loop {
             match socket.read_frame() {
                 Ok(frame) => {
+                    n_packets += 1;
+
                     let mut data = frame.data().to_vec();
                     while data.len() < 8 {
                         data.push(0);
                     }
+
                     if let Some(result) = ids.push(Packet::new(
                         Utc::now().naive_local().timestamp_millis(),
                         frame.id(),
                         data,
                         false,
                     )) {
+                        // Measure system speed
+                        if n_packets == 1000 {
+                            let duration = start_time.elapsed().as_secs_f64();
+                            speed_file
+                                .write_all(format!("{}\n", 1000_f64 / duration).as_bytes())
+                                .expect("Unable to write to log");
+                            n_packets = 0;
+                            start_time = time::Instant::now();
+                        }
+
                         log.write_all(
                             format!(
                                 "{},{},{},{}\n",
@@ -211,6 +231,14 @@ async fn main() -> Result<(), Error> {
                             print!("               \r");
                             io::stdout().flush().unwrap();
                         }
+                    // Measure system speed
+                    } else if n_packets == 1000 {
+                        let duration = start_time.elapsed().as_secs_f64();
+                        speed_file
+                            .write_all(format!("{}\n", 1000_f64 / duration).as_bytes())
+                            .expect("Unable to write to log");
+                        n_packets = 0;
+                        start_time = time::Instant::now();
                     }
                 }
                 Err(why) => panic!("Could not read frame: {}", why),
