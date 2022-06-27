@@ -3,12 +3,13 @@ use csv::{StringRecord, Writer};
 use linfa::dataset::Dataset;
 use ndarray_stats::QuantileExt;
 use std::{iter::Iterator, path::Path};
+use ndarray::Ix1;
 
 // 0 -> True positive
 // 1 -> True negative
 // 2 -> False positive
 // 3 -> False negative
-pub fn write_features(path: &Path, dataset: &Dataset<f64, u8>) -> Result<(), csv::Error> {
+pub fn write_features(path: &Path, dataset: &Dataset<f64,u8, Ix1>) -> Result<(), csv::Error> {
     let mut wtr = Writer::from_path(path)?;
     match wtr.write_record(dataset.feature_names()) {
         Ok(()) => {
@@ -26,7 +27,7 @@ pub fn write_features(path: &Path, dataset: &Dataset<f64, u8>) -> Result<(), csv
 
 pub fn write_features_unsupervised(
     path: &Path,
-    dataset: &Dataset<f64, ()>,
+    dataset: &Dataset<f64, (), Ix1>,
 ) -> Result<(), csv::Error> {
     let mut wtr = Writer::from_path(path)?;
     match wtr.write_record(dataset.feature_names()) {
@@ -42,7 +43,7 @@ pub fn write_features_unsupervised(
 }
 
 pub fn normalize(
-    dataset: &mut Dataset<f64, ()>,
+    dataset: &mut Dataset<f64, (), Ix1>,
     params: &Option<Vec<(f64, f64)>>,
 ) -> Option<Vec<(f64, f64)>> {
     if dataset.records.is_empty() {

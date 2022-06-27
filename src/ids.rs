@@ -198,7 +198,7 @@ impl Ids {
         packets: Vec<Packet>,
     ) -> DatasetBase<
         ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>,
-        ArrayBase<OwnedRepr<bool>, Dim<[usize; 2]>>,
+        ArrayBase<OwnedRepr<bool>, Dim<[usize; 1]>>,
     > {
         let mut features = Vec::new();
         let mut labels = Vec::new();
