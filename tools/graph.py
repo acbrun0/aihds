@@ -12,7 +12,7 @@ def label_to_color_alt(label):
         case 1 | 3:
             return 'b'
 
-def label_to_color(label, alt):
+def label_to_color(label):
     match label:
         case 0:
             return 'g'
@@ -46,14 +46,14 @@ def main():
                 fig, ax = plt.subplots()
                 fig.set_size_inches(20, 5)
                 ax.set_xlabel("Window")
-                ax.scatter(np.arange(0, len(dataset[col])), dataset[col], c = dataset["Label"].apply(label_to_color_alt if args.nolabel is not None else label_to_color).values if "Label" in dataset else "c")
+                ax.scatter(np.arange(0, len(dataset[col])), dataset[col], c = dataset["Label"].apply(label_to_color_alt if args.nolabel else label_to_color).values if "Label" in dataset else "c")
                 if col == "AvgTime":
                     ax.set_ylabel("Average Time")
                     ax.set_title("Average Time Between Packets of the Same ID")
                 elif col == "Entropy":
                     ax.set_ylabel(col)
                     ax.set_title("Average Entropy of Packets of the Same ID")
-                elif col == "HammingDistBytes":
+                elif col == "HammingDist":
                     ax.set_ylabel("Hamming Distance")
                     ax.set_title("Average Hamming Distance of Packets of the Same ID")
                 if "Label" in dataset:

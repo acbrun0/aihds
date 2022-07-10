@@ -14,6 +14,8 @@ def main():
     dataframe = pd.read_csv(args.dataset)
     figure(figsize=(20, 5))
     plt.plot(np.arange(0, dataframe.shape[0]), dataframe["Current(mA)"])
+    plt.xlabel("Record")
+    plt.ylabel("Current (mA)")
     plt.savefig("graphs/powerdraw.png")
 
 if __name__ == "__main__":
