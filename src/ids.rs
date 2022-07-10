@@ -158,10 +158,11 @@ impl Ids {
         let mut dataset = Dataset::new(Array2::from(features), Array1::from(labels))
             // .with_feature_names(vec!["AvgTime", "Entropy", "HammingDist", "HammingDistBytes", "GapBytes"]);
             .with_feature_names(vec!["AvgTime", "Entropy", "HammingDist"]);
+            // .with_feature_names(vec!["AvgTime", "HammingDist"]);
         let scaler = dataset::normalize(&mut dataset, &None);
 
         match Svm::<f64, _>::params()
-            .gaussian_kernel(20.0)
+            .gaussian_kernel(1.0)
             .nu_weight(0.001)
             .fit(&dataset)
         {
