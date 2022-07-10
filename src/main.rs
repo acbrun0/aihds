@@ -1,3 +1,14 @@
+#![warn(missing_docs)]
+
+//! **Automated and Intelligent Hacking Detection System**  
+//! A light-weight One Class SVM-based Intrusion Detection System for the Controller Area Network (CAN)
+//!
+//! This crate provides a machine-learning based intrusion detection system capable of detecting known and unkown CAN attacks.
+//! Features extracted from an attack-free basline are used to train the model, which then is able of analysing real-time traffic. The extrated features are:
+//! - Average packet frequency
+//! - Average network entropy
+//! - Average Hamming distance between consecutive packets
+
 mod dataset;
 mod ids;
 mod server;

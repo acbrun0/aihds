@@ -1,3 +1,5 @@
+#![warn(missing_docs)]
+
 use socketcan::{CANFilter, CANSocket, SFF_MASK};
 
 pub fn open_socket(interface: &str, filter: &Option<Vec<u32>>) -> CANSocket {

@@ -1,3 +1,5 @@
+#![warn(missing_docs)]
+
 use crate::dataset;
 use chrono::Utc;
 use linfa::{prelude::*, DatasetBase};
@@ -158,7 +160,7 @@ impl Ids {
         let mut dataset = Dataset::new(Array2::from(features), Array1::from(labels))
             // .with_feature_names(vec!["AvgTime", "Entropy", "HammingDist", "HammingDistBytes", "GapBytes"]);
             .with_feature_names(vec!["AvgTime", "Entropy", "HammingDist"]);
-            // .with_feature_names(vec!["AvgTime", "HammingDist"]);
+        // .with_feature_names(vec!["AvgTime", "HammingDist"]);
         let scaler = dataset::normalize(&mut dataset, &None);
 
         match Svm::<f64, _>::params()
