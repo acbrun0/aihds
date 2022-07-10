@@ -1,15 +1,15 @@
 use crate::ids;
 use csv::{StringRecord, Writer};
 use linfa::dataset::Dataset;
+use ndarray::Ix1;
 use ndarray_stats::QuantileExt;
 use std::{iter::Iterator, path::Path};
-use ndarray::Ix1;
 
 // 0 -> True positive
 // 1 -> True negative
 // 2 -> False positive
 // 3 -> False negative
-pub fn write_features(path: &Path, dataset: &Dataset<f64,u8, Ix1>) -> Result<(), csv::Error> {
+pub fn write_features(path: &Path, dataset: &Dataset<f64, u8, Ix1>) -> Result<(), csv::Error> {
     let mut wtr = Writer::from_path(path)?;
     match wtr.write_record(dataset.feature_names()) {
         Ok(()) => {
