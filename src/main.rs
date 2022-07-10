@@ -73,7 +73,7 @@ async fn main() -> Result<(), Error> {
         monitor.sort_unstable();
         monitor.dedup();
         println!("Monitoring {} IDs", monitor.len());
-        monitor.len() * 500
+        monitor.len() * 1000
     } else {
         1000000
     };
