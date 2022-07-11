@@ -1,5 +1,7 @@
 #![warn(missing_docs)]
 
+//! This module defines the IDS' functionality.
+
 use crate::dataset;
 use chrono::Utc;
 use linfa::{prelude::*, DatasetBase};
@@ -16,8 +18,19 @@ use std::{
     time::Instant,
 };
 
+/// Specifies what constitutes a set of features that is given as input to the OCSVM. The features are:  
+/// - Average time between consecutive packets  
+/// - Shannon entropy
+/// - Average Hamming distance between consecutive packets
 pub type Features = [f64; 3];
 
+/// Defines a IDS prediction as containing:  
+/// - the features used as input to the model  
+/// - the model's output  
+/// - the window's starting and ending timestamps
+type Prediction = (Features, bool, (i64, i64));
+
+/// Defines a Packet as having a timestamp, ID, data, and a flag indicating wether it is an attack packet or not.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Packet {
     timestamp: i64,
@@ -37,6 +50,15 @@ impl Packet {
     }
 }
 
+/// The IDS' structure.
+/// # Fields
+/// `model`: The [One Class Support Vector Machine][linfa_svm::Svm] that signals anomalies based of input features extracted from CAN traffic.  
+/// `scaler`: The vector of tuples containing minimum and maximum values for each feature in order to perform proper normalization.  
+/// `window`: The window of packets from which the features are extracted.  
+/// `size`: The size of the window.  
+/// `slide`: The amount of packets that move trough the window before features are extracted.  
+/// `counter`: The amount of packets that have moved through the window since the last feature extraction.  
+/// `monitor`: The list of IDs to monitor.  
 #[derive(Serialize, Deserialize)]
 pub struct Ids {
     model: Option<Svm<f64, bool>>,
@@ -49,6 +71,7 @@ pub struct Ids {
 }
 
 impl Ids {
+    /// Create a new instance of the IDS.
     pub fn new(
         model: Option<Svm<f64, bool>>,
         scaler: Option<Vec<(f64, f64)>>,
@@ -67,6 +90,13 @@ impl Ids {
         }
     }
 
+    /// Load an existing IDS from the file system.
+    /// # Examples
+    /// ```
+    /// use std::path::Path;
+    /// 
+    /// let ids = load(&Path::new("example.ids"))
+    /// ```
     pub fn load(path: &Path) -> Ids {
         let mut ids: Ids = bincode::deserialize(&fs::read(&path).unwrap()).unwrap();
         // Capacity is lost upon serialization
@@ -74,10 +104,42 @@ impl Ids {
         ids
     }
 
+    /// Returns the list of IDs that the IDS is monitoring.
+    /// 
+    /// # Examples
+    /// ```
+    /// if let Some(m) = ids.get_monitor() {
+    ///     println!("The IDS is monitoring the following IDs: {:?}.", m);
+    /// } else {
+    ///     println!("The IDS is monitoring all packets.");
+    /// }
+    /// ```
     pub fn get_monitor(&self) -> &Option<Vec<u32>> {
         &self.monitor
     }
 
+    /// Train a One Class Support Vector Machine for the IDS.
+    /// 
+    /// Training can be done in both an online and offline fashion. Online training is done by supplying a [socket][socketcan::CANSocket] from which attack-free traffic is to be collected until the limit specified in `baseline_len`. Offline training is done by supplying a list of files containing attack-free CAN traffic obtained from the [candump](https://github.com/linux-can/can-utils) tool. All packets will be read from the files.  
+    /// The trained model is saved in `models/ids`.
+    /// 
+    /// # Examples
+    /// 
+    /// ## Online training
+    /// ```
+    /// use crate::server;
+    /// use std::path::Path;
+    /// 
+    /// let socket = server::open_socket("can0", &monitor);
+    /// let mut ids = new(None, None, 1000, 250, monitor);
+    /// ids.train(Some(&socket), None, 1_000_000);
+    /// ```
+    /// 
+    /// ## Offline training
+    /// ```
+    /// let mut ids = new(None, None, 1000, 250, monitor);
+    /// ids.train(None, Some(Path::new("can_traffic.csv")), 1_000_000);
+    /// ```
     pub fn train(
         &mut self,
         socket: Option<&CANSocket>,
@@ -195,8 +257,18 @@ impl Ids {
         }
     }
 
+    /// Returns a dataset containing the extracted features from the list of packets.
+    /// 
+    /// # Examples
+    /// ```
+    /// use crate::dataset;
+    /// 
+    /// let ids = load(&Path::new("example.ids"));
+    /// let packets = dataset::read_from_csv(&Path::new("can_traffic.csv"));
+    /// let ds = ids.feature_set(packets);
+    /// ```
     #[allow(clippy::type_complexity)]
-    pub fn feature_file(
+    pub fn feature_set(
         &mut self,
         packets: Vec<Packet>,
     ) -> DatasetBase<
@@ -228,11 +300,25 @@ impl Ids {
         ])
     }
 
+    /// Executes a performance test on the IDS.  
+    /// Extracted features and model outputs are placed in `features/test.csv`.  
+    /// Returns:  
+    /// - the real labels  
+    /// - the model's predictions
+    /// - number of packets per second that were processed
+    /// 
+    /// # Examples
+    /// ```
+    /// let result = ids.test(packets);
+    /// println!("Real values: {:?}", result.0);
+    /// println!("Predictions: {:?}", result.1);
+    /// println!("Packets per second: {}", result.2);
+    /// ```
     #[allow(clippy::type_complexity)]
     pub fn test(
         &mut self,
         packets: Vec<Packet>,
-    ) -> (Vec<bool>, Vec<(Features, bool, (i64, i64))>, f32) {
+    ) -> (Vec<bool>, Vec<Prediction>, f32) {
         let mut predictions = Vec::new();
         let mut real = Vec::new();
         let mut features = Vec::new();
@@ -292,13 +378,34 @@ impl Ids {
         (real, predictions, n_packets as f32 / duration)
     }
 
-    pub fn push(&mut self, packet: Packet) -> Option<(Features, bool, (i64, i64))> {
+    /// Pushes a packet into the IDS' window.  
+    /// If the number of packets inserted corresponds to the configured window slide, a prediction is returned.
+    /// 
+    /// # Examples
+    /// ```
+    /// for packet in packets {
+    ///     if let Some(result) = ids.push(packet) {
+    ///         if result.1 {
+    ///             println!("An attack was detected inside window {} based on {}.",
+    ///                 result.2,
+    ///                 result.0
+    ///             );
+    ///         } else {
+    ///             println!("No attack was detected inside window {} based on {}.",
+    ///                 result.2,
+    ///                 result.0
+    ///             );
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    pub fn push(&mut self, packet: Packet) -> Option<Prediction> {
         if let Some(filter) = &self.monitor {
             if !filter.contains(&packet.id) {
                 return None;
             }
         }
-        let mut prediction: Option<(Features, bool, (i64, i64))> = None;
+        let mut prediction: Option<Prediction> = None;
         if self.window.len() < self.window.capacity() {
             self.window.push(packet);
         } else {
@@ -322,6 +429,21 @@ impl Ids {
         prediction
     }
 
+    /// Performs a prediction based on the window's contents.
+    /// 
+    /// # Panics
+    /// If there is no model or scaler present in the IDS.
+    /// 
+    /// # Examples
+    /// ```
+    /// if let Some(pred) = ids.predict() {
+    ///     if pred.1 {
+    ///         println!("Alert based on {}", pred.0);
+    ///     } else {
+    ///         println!("No alert based on {}", pred.0);
+    ///     }
+    /// }
+    /// ```
     fn predict(&self) -> Option<(Features, bool)> {
         if let Some(scaler) = &self.scaler {
             if let Some(model) = &self.model {
@@ -351,6 +473,21 @@ impl Ids {
         }
     }
 
+    /// Separates the window's packets by ID and extracts the following features from each set of IDs:  
+    /// - Average time between packets  
+    /// - Shannon entropy
+    /// - Hamming distance  
+    /// 
+    /// Returns the average between all IDs.
+    /// 
+    /// # Examples
+    /// ```
+    /// if let Some(features) = ids.extract_features() {
+    ///     println("Average time between packets: {}", features[0]);
+    ///     println("Average Shannon entorpy: {}", features[1]);
+    ///     println("Average Hamming distance: {}", features[2]);
+    /// }
+    /// ```
     fn extract_features(&self) -> Option<Features> {
         let mut feat = HashMap::new();
         let mut avg_time = Vec::new();

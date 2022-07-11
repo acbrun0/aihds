@@ -116,6 +116,8 @@ pub fn normalize(
 /// 
 /// # Examples
 /// ```
+/// use std::path::Path;
+/// 
 /// let packets = packets_from_csv(vec![Path::new("log.csv")])
 /// ```
 pub fn packets_from_csv(paths: Vec<&Path>) -> Result<Vec<ids::Packet>, csv::Error> {

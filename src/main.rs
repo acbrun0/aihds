@@ -58,14 +58,18 @@ struct Args {
     live: bool,
 }
 
+/// Describes the configuration file.
 #[derive(Deserialize)]
 struct Config {
     window: Window,
 }
 
+/// Represents a IDS window.
 #[derive(Deserialize)]
 struct Window {
+    /// The size of the window.
     size: usize,
+    /// The number of packets that enter and leave the window before feature extraction is performed.
     slide: u16,
 }
 
@@ -105,7 +109,7 @@ async fn main() -> Result<(), Error> {
             println!("Loaded model from {}", modelpath);
             match dataset::packets_from_csv(paths) {
                 Ok(packets) => {
-                    let dataset = ids.feature_file(packets);
+                    let dataset = ids.feature_set(packets);
                     let mut wtr = Writer::from_path(Path::new("features/extracted.csv")).unwrap();
                     match wtr.write_record(dataset.feature_names()) {
                         Ok(()) => {
