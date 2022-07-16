@@ -94,7 +94,7 @@ impl Ids {
     /// # Examples
     /// ```
     /// use std::path::Path;
-    /// 
+    ///
     /// let ids = load(&Path::new("example.ids"))
     /// ```
     pub fn load(path: &Path) -> Ids {
@@ -105,7 +105,7 @@ impl Ids {
     }
 
     /// Returns the list of IDs that the IDS is monitoring.
-    /// 
+    ///
     /// # Examples
     /// ```
     /// if let Some(m) = ids.get_monitor() {
@@ -119,22 +119,22 @@ impl Ids {
     }
 
     /// Train a One Class Support Vector Machine for the IDS.
-    /// 
+    ///
     /// Training can be done in both an online and offline fashion. Online training is done by supplying a [socket][socketcan::CANSocket] from which attack-free traffic is to be collected until the limit specified in `baseline_len`. Offline training is done by supplying a list of files containing attack-free CAN traffic obtained from the [candump](https://github.com/linux-can/can-utils) tool. All packets will be read from the files.  
     /// The trained model is saved in `models/ids`.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ## Online training
     /// ```
     /// use crate::server;
     /// use std::path::Path;
-    /// 
+    ///
     /// let socket = server::open_socket("can0", &monitor);
     /// let mut ids = new(None, None, 1000, 250, monitor);
     /// ids.train(Some(&socket), None, 1_000_000);
     /// ```
-    /// 
+    ///
     /// ## Offline training
     /// ```
     /// let mut ids = new(None, None, 1000, 250, monitor);
@@ -226,7 +226,7 @@ impl Ids {
         let scaler = dataset::normalize(&mut dataset, &None);
 
         match Svm::<f64, _>::params()
-            .gaussian_kernel(1.0)
+            .gaussian_kernel(10.0)
             .nu_weight(0.001)
             .fit(&dataset)
         {
@@ -258,11 +258,11 @@ impl Ids {
     }
 
     /// Returns a dataset containing the extracted features from the list of packets.
-    /// 
+    ///
     /// # Examples
     /// ```
     /// use crate::dataset;
-    /// 
+    ///
     /// let ids = load(&Path::new("example.ids"));
     /// let packets = dataset::read_from_csv(&Path::new("can_traffic.csv"));
     /// let ds = ids.feature_set(packets);
@@ -306,7 +306,7 @@ impl Ids {
     /// - the real labels  
     /// - the model's predictions
     /// - number of packets per second that were processed
-    /// 
+    ///
     /// # Examples
     /// ```
     /// let result = ids.test(packets);
@@ -315,10 +315,7 @@ impl Ids {
     /// println!("Packets per second: {}", result.2);
     /// ```
     #[allow(clippy::type_complexity)]
-    pub fn test(
-        &mut self,
-        packets: Vec<Packet>,
-    ) -> (Vec<bool>, Vec<Prediction>, f32) {
+    pub fn test(&mut self, packets: Vec<Packet>) -> (Vec<bool>, Vec<Prediction>, f32) {
         let mut predictions = Vec::new();
         let mut real = Vec::new();
         let mut features = Vec::new();
@@ -380,7 +377,7 @@ impl Ids {
 
     /// Pushes a packet into the IDS' window.  
     /// If the number of packets inserted corresponds to the configured window slide, a prediction is returned.
-    /// 
+    ///
     /// # Examples
     /// ```
     /// for packet in packets {
@@ -430,10 +427,10 @@ impl Ids {
     }
 
     /// Performs a prediction based on the window's contents.
-    /// 
+    ///
     /// # Panics
     /// If there is no model or scaler present in the IDS.
-    /// 
+    ///
     /// # Examples
     /// ```
     /// if let Some(pred) = ids.predict() {
@@ -477,9 +474,9 @@ impl Ids {
     /// - Average time between packets  
     /// - Shannon entropy
     /// - Hamming distance  
-    /// 
+    ///
     /// Returns the average between all IDs.
-    /// 
+    ///
     /// # Examples
     /// ```
     /// if let Some(features) = ids.extract_features() {

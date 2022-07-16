@@ -37,7 +37,7 @@ pub fn open_socket(interface: &str, filter: &Option<Vec<u32>>) -> CANSocket {
 }
 
 /// Make a POST request to a HTTP server.
-/// 
+///
 /// This function makes an asyncronous HTTP POST request to a specified URL using the [reqwest] library. It allows the communication of an alarm and the extracted features, as well as an optional message.
 /// # Examples
 /// ```

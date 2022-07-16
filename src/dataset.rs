@@ -15,7 +15,7 @@ use std::{iter::Iterator, path::Path};
 /// use linfa::dataset::Dataset;
 /// use ndarray::{Array1, Array2};
 /// use std::path::Path;
-/// 
+///
 /// let ds = Dataset::new(Array2::from(vec![[1,2][3,4]]), Array1::from([0,1]));
 /// write_features(Path::new("features.csv"), ds);
 /// ```
@@ -45,7 +45,7 @@ pub fn write_features(path: &Path, dataset: &Dataset<f64, u8, Ix1>) -> Result<()
 /// use linfa::dataset::Dataset;
 /// use ndarray::{Array1, Array2};
 /// use std::path::Path;
-/// 
+///
 /// let ds = Dataset::new(Array2::from(vec![[1,2][3,4]]), Array1::from(vec![(), ()]));
 /// write_features_unsupervised(Path::new("features.csv"), ds);
 /// ```
@@ -67,18 +67,18 @@ pub fn write_features_unsupervised(
 }
 
 /// Normalize a dataset according to a provided list of minimum and maximum values. If no values are provided, minimum and maximum values are calculated, the dataset is normalized, and the values are returned.
-/// 
+///
 /// # Examples
 /// ```
 /// use linfa::dataset::Dataset;
 /// use ndarray::{Array1, Array2};
-/// 
+///
 /// let ds0 = Dataset::new(Array2::from(vec![[1,2][3,4]]), Array1::from([0,1]));
 /// let ds1 = ds.clone();
-/// 
+///
 /// let minmax = normalize(&mut ds0, &None);
 /// normalize(&mut ds1, &minmax);
-/// 
+///
 /// assert_eq!(ds0, ds1);
 /// ```
 pub fn normalize(
@@ -105,7 +105,7 @@ pub fn normalize(
 }
 
 /// Reads a list of [candump](https://github.com/linux-can/can-utils) log CSV file into a vector of [packets][ids::Packet].  
-/// 
+///
 /// The log file must have the following format:  
 /// *Timestamp,ID,DLC,Data,Label*  
 /// *1478195722.758421,0430,8,00,00,00,00,00,00,00,00,Normal*  
@@ -113,11 +113,11 @@ pub fn normalize(
 /// *1478195722.769240,0350,8,05,20,74,68,78,00,00,41,Normal*  
 /// *1478195722.775132,00df,8,8c,ab,f2,26,7a,29,1a,0c,Attack*  
 /// *1478195722.775957,06ea,8,25,10,9c,ed,5b,16,2c,18,Attack*  
-/// 
+///
 /// # Examples
 /// ```
 /// use std::path::Path;
-/// 
+///
 /// let packets = packets_from_csv(vec![Path::new("log.csv")])
 /// ```
 pub fn packets_from_csv(paths: Vec<&Path>) -> Result<Vec<ids::Packet>, csv::Error> {

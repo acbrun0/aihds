@@ -26,6 +26,7 @@ use std::{
     thread, time,
 };
 
+/// Defines the set of CLI options.
 #[derive(Parser)]
 #[clap(author, version, about)]
 struct Args {
