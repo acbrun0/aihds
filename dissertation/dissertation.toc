@@ -100,7 +100,7 @@
 \contentsline {chapter}{\numberline {9}{Future work}}{64}{chapter.9}%
 \contentsline {chapter}{\numberline {10}{Conclusion}}{65}{chapter.10}%
 \vspace \bigskipamount 
-\contentsline {chapter}{\numberline {A}{Feature selection}}{75}{appendix.A}%
-\contentsline {chapter}{\numberline {B}{Feature extraction}}{80}{appendix.B}%
-\contentsline {chapter}{\numberline {C}{Code documentation}}{99}{appendix.C}%
+\contentsline {chapter}{\numberline {A}{Feature selection}}{77}{appendix.A}%
+\contentsline {chapter}{\numberline {B}{Feature extraction}}{82}{appendix.B}%
+\contentsline {chapter}{\numberline {C}{Code documentation}}{101}{appendix.C}%
 \providecommand \tocbasic@end@toc@file {}\tocbasic@end@toc@file 
