@@ -1,0 +1,146 @@
+\documentclass[
+  % Replace twoside with oneside if you are printing your thesis on a single side
+  % of the paper, or for viewing on screen.
+  oneside,
+  %twoside,
+  11pt, a4paper,
+  footinclude=true,
+  headinclude=true,
+  cleardoublepage=empty
+]{scrbook}
+
+\usepackage{dissertation}
+\usepackage[T1]{fontenc}
+\usepackage{textcomp}
+\usepackage[titles]{tocloft}
+\usepackage{xcolor}
+
+\setlength{\cftbeforechapskip}{2ex}
+\setlength{\cftbeforesecskip}{0.5ex}
+
+\renewcommand{\cftpartfont}{%
+  \fontsize{12}{14}\usefont{OT1}{phv}{bc}{n}\selectfont
+}
+\renewcommand{\cftchapfont}{%
+  \fontsize{11}{13}\usefont{OT1}{phv}{bc}{n}\selectfont
+}
+\renewcommand{\cftsecfont}{%
+  \fontsize{10}{11}\usefont{OT1}{phv}{}{n}\selectfont
+}
+\renewcommand{\cftsubsecfont}{%
+  \fontsize{9}{10}\usefont{OT1}{phv}{}{n}\selectfont
+}
+\renewcommand{\cftfigfont}{%
+  \fontsize{9}{10}\usefont{OT1}{phv}{}{n}\selectfont
+}
+\renewcommand{\cfttabfont}{%
+  \fontsize{9}{10}\usefont{OT1}{phv}{}{n}\selectfont
+}
+
+\usepackage[all]{xy}
+\usepackage{circuitikz}
+
+\titleA{Automated and Intelligent Hacking Detection System}
+\author{Bruno Alves Martins Carvalho}
+\supervisor{José Bacelar Almeida}
+\cosupervisor{Luís Sobral Silva}
+\date{\myear}
+
+\makeglossaries
+\include{glossary}
+
+\begin{document}\fontfamily{phv}\fontseries{mc}\selectfont
+
+\input{def/title}
+\cleardoublepage
+
+\pagenumbering{alph}
+\setcounter{page}{0}
+
+\chapter*{Copyright and Terms of Use for Third Party Work}
+
+This dissertation reports on academic work that can be used by third parties as long as the internationally accepted standards and good practices are respected concerning copyright and related rights.
+\vskip 1em
+\noindent This work can thereafter be used under the terms established in the license below.
+\vskip 1em
+\noindent Readers needing authorisation conditions not provided for in the indicated licensing should contact the author through the RepositóriUM of the University of Minho.
+
+\section*{License granted to users of this work:}
+
+\CCBY
+
+\include{parts/acks}
+\cleardoublepage
+
+\include{parts/soi}
+
+\include{parts/abstract}
+\cleardoublepage
+\include{parts/resumo}
+\cleardoublepage
+\pagenumbering{roman}
+\setcounter{page}{3}
+
+\cleardoublepage
+\phantomsection
+\addcontentsline{toc}{chapter}{Contents}
+\tableofcontents
+
+\cleardoublepage
+\listoffigures
+
+\cleardoublepage
+\listoftables
+
+\cleardoublepage
+\pagenumbering{arabic}
+\setcounter{page}{8}
+
+\part{Introductory material}
+\include{parts/introduction/intro}
+\include{parts/introduction/background}
+\include{parts/introduction/sota}
+
+\part{Core}
+\include{parts/core/contrib}
+\include{parts/core/datasets}
+\include{parts/core/ids}
+\include{parts/core/results}
+
+\part{Conclusion}
+\include{parts/conclusion/futurework}
+\include{parts/conclusion/conclusion}
+%\include{parts/conclusion/nextsteps}
+		
+\bookmarksetup{startatroot}
+\addtocontents{toc}{\bigskip}
+\cleardoublepage
+
+\bibliography{library}
+
+\printglossary[type=\acronymtype]
+
+\appendix
+\renewcommand\chaptername{Appendix}
+
+\chapter{Feature selection}
+\label{apdx:sec:feature_selection}
+\include{parts/appendix/feature_selection}
+
+\chapter{Feature extraction}
+\label{apdx:sec:feature_extraction}
+\include{parts/appendix/graphs}
+
+\chapter{Code documentation}
+\label{apdx:sec:code_documentation}
+\include{parts/appendix/docs}
+
+\begin{backcover}
+\thispagestyle{empty} \pagecolor{white} \textcolor{black} {\fontfamily{phv}\fontseries{mc}\selectfont ~\vfill
+\noindent
+% NB: place here information about funding, FCT project, etc in which the work is framed. Leave empty otherwise.
+%
+\vfill ~}
+\end{backcover}
+
+\end{document}
