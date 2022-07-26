@@ -20,9 +20,9 @@ The main application domains for a modern vehicle are shown in Figure \ref{fig:C
     \label{fig:Car_Domains}
 \end{figure}
 
-Such an increase in computational complexity allows for the introduction of vulnerabilities in the software and, with applications extending multiple domains and interacting with other applications, there is an increased concern about their security. Until recently, applications were developed by the manufacturers to run directly on the embedded hardware. The usual approach was to add a new \gls{ecu} for every new function to be implemented. However, this method has made the vehicle’s internal network too complex for safe and efficient handling. Therefore, a platform-based approach has become of interest to both manufacturers and developers as it provides developers with an abstraction of the underlying hardware as well as making it possible to write reusable applications to run on the same standardised platform, but different hardware. This simplifies both the application development as well as its deployment. Besides, the authors in \cite{Holle} suggest that an approach like that of the mobile platforms could be taken. In this case, an open \gls{sdk} is provided to third-party developers to create and distribute their applications similarly to mobile app stores.\par
+Such an increase in computational complexity allows for the introduction of vulnerabilities in the software and, with applications extending multiple domains and interacting with other applications, there is an increased concern about their security. Until recently, applications were developed by the manufacturers to run directly on the embedded hardware. The usual approach was to add a new \gls{ecu} for every new function to be implemented. However, this method has made the vehicle's internal network too complex for safe and efficient handling. Therefore, a platform-based approach has become of interest to both manufacturers and developers as it provides developers with an abstraction of the underlying hardware as well as making it possible to write reusable applications to run on the same standardised platform, but different hardware. This simplifies both the application development as well as its deployment. Besides, the authors in \cite{Holle} suggest that an approach like that of the mobile platforms could be taken. In this case, an open \gls{sdk} is provided to third-party developers to create and distribute their applications similarly to mobile app stores.\par
 
-This increase in application diversity and functionality means that the vehicle handles much more sensitive information, especially when considering its connectivity to devices as personal as one’s smartphone. This includes information like common routes and schedules, call history, or even conversations recorded with the internal microphones (otherwise used for phone conversations on virtual assistances). As such, modern vehicles are becoming a major target for attackers who seek to obtain information on the user, not only because they contain sensitive information, but also because of the lack of security elements present in the vehicle design and architecture. This is because manufacturers have always designed their vehicles with safety, but no security in mind \citep{Siegel2018}.
+This increase in application diversity and functionality means that the vehicle handles much more sensitive information, especially when considering its connectivity to devices as personal as one's smartphone. This includes information like common routes and schedules, call history, or even conversations recorded with the internal microphones (otherwise used for phone conversations on virtual assistances). As such, modern vehicles are becoming a major target for attackers who seek to obtain information on the user, not only because they contain sensitive information, but also because of the lack of security elements present in the vehicle design and architecture. This is because manufacturers have always designed their vehicles with safety, but no security in mind \citep{Siegel2018}.
 
 \subsection{Architecture}
 
@@ -111,41 +111,57 @@ The CIA triad is a common way of refering to the fundamental elements of informa
     \item \textbf{Availability}, requiring that services are fully available to authorised users.
 \end{itemize}
 
-As security concerns grow due to the connecivity of complex applications these aim to fullfil these common security requirements. Moreover, privacy is also a concern, as \gls{v2v} and \gls{v2i} applications could share messages containing personally identifiable information, such as location and the identity of the vehicle's occupants.
+As security concerns grow due to the connecivity of complex applications, they aim to fullfil these common security requirements. Moreover, privacy is also a concern, as \gls{v2v} and \gls{v2i} applications could share messages containing personally identifiable information, such as location and the identity of the vehicle's occupants.
+
+\subsection{Attackers}
+
+To safeguard any system, it is crucial to understand the attackers. These may vary in terms of physical access to the system, as well as the amount of knowledge and resources.\par
+\cite{wolf2009} divides in-vehicle system attackers into internal and external. An authorized user attempting to escalate their privileges is a classic internal attacker. It is considered that internal attackers have unrestricted physical access to the vehicle. An external attacker, however, has little to no physical access to the vehicle. Internal attackers are those who have the necessary key materials to log on as authorized network users in VANET settings. Attackers may be equipped with low, medium, or high levels of resources and expertise.
+
+\subsection{Attack impact}
+
+Different attacks have different effects on the system and its stakeholders, depending on which security goal is compromised \citep{Le2018}:
+
+\begin{itemize}
+    \item \textbf{Safety}, where passengers and other road users are harmed. When the integrity and accessibility of data are violated, safety is jeopardized. An attacker could, for example, trigger or disable brakes by injecting or suppressing network messages.
+    \item \textbf{Financial}, in which unauthorised commercial transactions are performed and intellectual property disclosed. There are financial consequences when an attacker is able to disrupt any of the security goals. If confidentiality is not assured, an attacker could steal proprietary information. Vehicle owners could also replace components or enable locked features. The lack of data availablity for certain applications could also mean a financial loss for the manufacturer.
+    \item \textbf{Operational}, preventing non-safety functions from performing as planned during operation. The operational aspect of the vehicle is disrupted when the attacker compromises information integrity or availability. As mentioned before, breaking integrity can have operational consequences, such as misbehaving brakes. On the other hand, unavailable applications are also an operational failure.
+    \item \textbf{Privacy}, giving unauthorized access to information on the whereabouts and identities of drivers or owners of vehicles. There is a privacy breach when confidentiality is broken. This is due to the amount of private information that modern vehicles hold on their drivers, which, if compromised, constitutes a privacy breach.
+\end{itemize}
 
 \subsection{Common attack patterns}
+
+Many software and hardware components contain vulnerabilities that can be exploited. The addition of communication, apps, and platforms to automotive technologies that were not given much thought to security and privacy is one of the underlying causes of these vulnerabilities. When vehicles were isolated and applications were mostly for control systems, the lack of protection against IT security risks was not a severe concern. Additionally, vehicles have a long life-time. Older technology and vehicles are frequently not upgraded to defend against new threats during that period.\par
 
 The authors of \cite{Kim2021} surveyed previously published research on attacks against autonomous vehicles, although some attacks are also effective against non-autonomous vehicles. They classify attack research into three categories: attacks on the automotive control system, attacks on the autonomous driving system components, more specifically through mobile apps, and attacks on Vehicle-to-Everything (V2X) communication technologies.
 
 \subsubsection{Automotive control systems}
 
-One type of automotive control system attack targets the vehicle’s \glspl{ecu}. Taking advantage of network vulnerabilities, research shows that it is possible to load firmware into \glspl{ecu} that control components such as the door-lock and telematics, primarily through fuzzing \citep{Koscher2010}. The vulnerabilities described by \cite{rouf2010security} showed that it is possible for an attacker to remotely display a false tire pressure warning or disable the \gls{tpms} \gls{ecu}, as well as vehicle tracking from 10-40 metres. More recently, it was shown that \glspl{ecu} present in Tesla vehicles could be controlled remotely by sending arbitrary \gls{can} packets, which led Tesla to introduce code-signing protection in an Over-The-Air (OTA) update \citep{Nie2017}. \cite{miller2015remote} showed that, even remotely, and attacker can reprogram \glspl{ecu}, control display and sound systems, the instrument cluster, body components, interfere with the engine operation, lock and disable brakes, prevent the car from turning on or off, etc. They showed that, even from telematics \glspl{ecu}, this type of attack has the same effects as directly injecting messages into \gls{can} buses.\par
+One type of automotive control system attack targets the vehicle's \glspl{ecu}. Taking advantage of network vulnerabilities, research shows that it is possible to load firmware into \glspl{ecu} that control components such as the door-lock and telematics, primarily through fuzzing \citep{Koscher2010}. The vulnerabilities described by \cite{rouf2010security} showed that it is possible for an attacker to remotely display a false tire pressure warning or disable the \gls{tpms} \gls{ecu}, as well as vehicle tracking from 10-40 metres. More recently, it was shown that \glspl{ecu} present in Tesla vehicles could be controlled remotely by sending arbitrary \gls{can} packets, which led Tesla to introduce code-signing protection in an Over-The-Air (OTA) update \citep{Nie2017}. \cite{miller2015remote} showed that, even remotely, and attacker can reprogram \glspl{ecu}, control display and sound systems, the instrument cluster, body components, interfere with the engine operation, lock and disable brakes, prevent the car from turning on or off, etc. Even from telematics \glspl{ecu}, this type of attack has the same effects as directly injecting messages into \gls{can} buses.\par
 
-In-vehicle network attacks aim to disrupt communication between vehicle components. In \citep{Palanca2017}, the authors showed that the \gls{can} bus is vulnerable to selective \gls{dos} attacks, which cannot be detected at the frame level. Sniffing and replay attacks have also been demonstrated, as per \cite{hoppe2009applying}. \cite{nilsson2009first} also explored possible attacks on the FlexRay protocol. They showed that, because there is no encryption, it is possible to read all data sent to the bus, as well as insert unauthenticated messages. A successful attack causes serious disruption of the vehicle control system and may harm drivers and passengers.\par
+In-vehicle network attacks aim to disrupt communication between vehicle components. In \cite{Palanca2017}, the authors showed that the \gls{can} bus is vulnerable to selective \gls{dos} attacks, which cannot be detected at the frame level. Sniffing and replay attacks have also been demonstrated, as per \cite{hoppe2009applying}. \cite{nilsson2009first} also explored possible attacks on the FlexRay protocol. They showed that, because there is no encryption, it is possible to read all data sent to the bus, as well as insert unauthenticated messages. A successful attack causes serious disruption of the vehicle control system and may harm drivers and passengers.\par
 
 Passive key-less entry and start systems used in modern cars are a major attack target. It has been shown that some systems are vulnerable to relay attacks by duplicating the existing signal \citep{francillon2011relay}. Through the analysis of cryptographic vulnerabilities, \cite{verdult2012gone} demonstrated how private keys could be recovered from the Hitag2 transponder in order to bypass the key's cryptographic authentication in as little as 6 minutes. \cite{garcia2016lock} also showed how to recover cryptographic keys and clone a VW group remote via eavesdropping on a single signal, as well as another Hitag2 attack able to clone the remote in just a few minutes.\par
 
 \subsubsection{External communication technologies}
 
-A comprehensive survey of attacks on \glspl{vanet} \cite{Hasrouny2017} showed that these are vulnerable to the same attacks as a regular network, such as \gls{dos}, man in the middle, message suppression, or spoofing.\par
-
-The integration of Bluetooth has become standard, and it brings with it a new set of vulnerabilities. In \cite{Cheah2017}, it was shown that manufacturers still include the ability to use legacy pairing, which led the authors to identify vulnerabilities. Other research has shown the execution of attacks using Bluetooth as a vulnerable component, as shown in \cite{Cai2019} with BMW cars.
+A comprehensive survey of attacks on \glspl{vanet} by \cite{Hasrouny2017} showed that these are vulnerable to the same attacks as a regular network, such as \gls{dos}, man in the middle, message suppression, or spoofing. In addition, the integration of Bluetooth has become standard, and it brings with it a new set of vulnerabilities. In \cite{Cheah2017}, it was shown that manufacturers still include the ability to use legacy pairing, which led the authors to identify vulnerabilities. Other research has shown the execution of attacks using Bluetooth as a vulnerable component, as shown in \cite{Cai2019} with BMW cars.
 
 \subsubsection{Mobile apps}
 
-The increase in connectivity between the driver’s vehicle and his smartphone led to an expansion in the vehicle’s attack surface. A malicious smartphone app could be used to gain unauthorised access to a vehicle without needing to be in its proximity (i.e., using long-range wireless networks). The authors of \cite{Woo2015} exploited \gls{can} vulnerabilities in the process of demonstrating this scenario. Vulnerabilities in the MirrorLink protocol have also allowed attackers to send \gls{can} packets through a smartphone, opening the possibility for a variety of exploits. The attack method present in \cite{mazloom2016security} took advantage of a heap overflow. A vulnerability in Blue Link, a vehicle control application from Hyundai Motors, allowed the recovery of the driver's username, password, and PIN. An attacker could also exploit this vulnerability to remotely unlock the vehicle \citep{toddbluelink}. With the smartphone being relatively vulnerable to attacks, and with manufacturers providing more functionality to it's connection to the vehicle, it is expected that these type of applications become a major target \citep{Kim2021}.
+The increase in connectivity between the driver's vehicle and his smartphone led to an expansion in the vehicle's attack surface. A malicious smartphone app could be used to gain unauthorised access to a vehicle without needing to be in its proximity (\textit{i.e.} using long-range wireless networks). The authors of \cite{Woo2015} exploited \gls{can} vulnerabilities in the process of demonstrating this scenario. Vulnerabilities in the MirrorLink protocol have also allowed attackers to send \gls{can} packets through a smartphone, opening the possibility for a variety of exploits. The attack method present in \cite{mazloom2016security} took advantage of a heap overflow. A vulnerability in Blue Link, a vehicle control application from Hyundai Motors, allowed the recovery of the driver's username, password, and PIN. An attacker could also exploit this vulnerability to remotely unlock the vehicle \citep{toddbluelink}. With the smartphone being relatively vulnerable to attacks, and with manufacturers providing more functionality to its connection to the vehicle, it is expected that these type of applications become a major target \citep{Kim2021}.
 
 \subsection{Proposed solutions}
 
-The development of protection mechanisms faces multiple constraints resulting from the limited computing resources available to each \gls{ecu} as well as the time-sensitive nature of their operations. There is also a need to assert retro-compatibility with currently used embedded technologies, and, when considering external entities, interoperability between their security mechanisms. Two distinct vehicles, for example, should not be prevented from communicating because their protocols are incompatible \citep{Studnia2013}.\par
+The development of protection mechanisms faces multiple constraints resulting from the limited computing resources available to each \gls{ecu} as well as the time-sensitive nature of their operations. There is also a need to assert retro-compatibility with currently used embedded technologies and, when considering external entities, interoperability between their security mechanisms. Two distinct vehicles, for example, should not be prevented from communicating because their protocols are incompatible \citep{Studnia2013}.\par
 
 There is an effort by European projects such as Secure Vehicular Communication (SeVeCom) \citep{Kargl2008}, Preparing Secure Vehicle-to-X Communication Systems (PRESERVE) \citep{PRESERVE}, or E-safety Vehicle Intrusion Protected Applications (EVITA) \citep{EVITA}, to design secure vehicle communication architectures.\par
 
 For \glspl{vanet}, the usage of public-key infrastructure has also been proposed, to assert the authenticity of the messages, as well as the use of pseudo-anonymity to preserve privacy. For preventing \gls{dos} attacks, some routing protocols have also been studied \citep{Hasrouny2017}.\par
 
-Regarding internal protection, there have been several attempts to leverage cryptography in securing the \gls{ecu} and the \gls{can} bus. An authentication protocol, such as the one proposed in \citep{Herrewege2011} or \citep{Groza2018}, would prevent most injection attacks. Another approach, taken by the EVITA project, consists in the implementation of a dedicated hardware module for cryptographic operations \citep{Wolf2011}.\par
+Regarding internal protection, there have been several attempts to leverage cryptography in securing the \gls{ecu} and the \gls{can} bus. An authentication protocol, such as the one proposed in \cite{Herrewege2011} or \cite{Groza2018}, would prevent most injection attacks. Another approach, taken by the EVITA project, consists in the implementation of a dedicated hardware module for cryptographic operations \citep{Wolf2011}.\par
 
-\gls{ids} has traditionally been used in network security, more specifically in desktop IT. \citep{hoppe2009applying} is one of the first to mention its usage in automotive IT as a “promising supplemental measure”. They also discuss a way to optimally communicate a warning to the driver.
+\gls{ids} has traditionally been used in network security, more specifically in desktop IT. \cite{hoppe2009applying} are one of the first to mention its usage in automotive IT as a “promising supplemental measure”. They also discuss a way to optimally communicate a warning to the driver.
 
 \section{In-vehicle networks}
 
@@ -154,8 +170,30 @@ For a long time, the only electronic component in a vehicle was the radio. Howev
 \cite{AutomotiveNetworks} lists some roles that a network might serve. These are safe/time-critical data, control data, backbone, infotainment, multi-gig data, and low cost/speed data. Below is an introduction to some of the dominant automotive network protocols, and a general overview of these networks can be seen in Table \ref{fig:auto_networks}.
 
 \begin{table}
+    \scriptsize
     \centering
-    \includegraphics[width = \textwidth]{img/parts/introduction/Network Table.png}
+    \begin{tabular}{*{4}{c}}
+    \toprule
+    \textbf{Technology} & \textbf{Domain} & \textbf{Maximum bandwidth} & \textbf{Collision avoidance mechanism}\\
+    \midrule
+    \acrshort{lin} & Low Cost/Speed & 20 Kb/s & Time divided media access\\
+    \midrule
+    \multirow{4}{*}{\gls{can}} & Low Cost/Speed & 125 Kb/s (Low-Speed \gls{can}) & \multirow{4}{*}{Non-destructive arbitration}\\
+    & Backbone & 1 Mb/s (CAN 2.0) &\\
+    & \multirow{2}{*}{Control} & 10 Mb/s (\gls{can} FD) &\\
+    & & 10 Mb/s \gls{can} XL &\\
+    \midrule
+    FlexRay & Safety/Time Critical/Backbone Control & 10 Mb/s & Time divided media access\\
+    \midrule
+    \acrshort{most} & Infotainment & 150 Mb/s & N/A\\
+    \midrule
+    \multirow{5}{*}{Automotive Ethernet} & Safety/Time Critical & \multirow{5}{*}{10Gb/s} & \multirow{5}{*}{N/A}\\
+    & Multi-Gig & &\\
+    & Infotainment & &\\
+    & Backbone & &\\
+    & Control & &\\
+    \bottomrule
+    \end{tabular}
     \caption{Characteristics of dominant automotive networks}
     \label{fig:auto_networks}
 \end{table}
@@ -163,7 +201,7 @@ For a long time, the only electronic component in a vehicle was the radio. Howev
 \subsection{Controller Area Network}
 \label{subsec:can}
 
-The development of the \gls{can} standard was started in 1983 by Uwe Kiencke. It was first introduced in February of 1986 at the Society of Automotive Engineers Congress by Robert Bosch GmbH \citep{can}. Following the publication of \gls{can} 2.0 by Bosch in 1991, the \gls{iso} released the \gls{can} standard ISO 11898. The Mercedes W140, first available in 1991, was the first vehicle with a \gls{can}-based in-vehicle network \citep{CAN_Merc}.\par
+The development of the \gls{can} standard started in 1983 by Uwe Kiencke. It was first introduced in February of 1986 at the Society of Automotive Engineers Congress by Robert Bosch GmbH \citep{can}. Following the publication of \gls{can} 2.0 by Bosch in 1991, the \gls{iso} released the \gls{can} standard \gls{iso} 11898. The Mercedes W140, first available in 1991, was the first vehicle with a \gls{can}-based in-vehicle network \citep{CAN_Merc}.\par
 
 \gls{can} messages are sent in broadcast mode, which means that all \glspl{ecu} in a network receive all transmissions. Devices that receive a message acknowledge their reception. Each \gls{ecu} listens for messages from a subset of IDs, and each message ID must be sent by no more than one \gls{ecu} \citep{kulandaivel2019canvas}. It was designed with the objective of building a low-cost, and reliable network, and is therefore used mainly used for powertrain, chassis and body electronics. Its limited bandwidth of 1Mb/s does not allow for its use in other domains, such as the infotainment system \citep{Huang2019}.\par
 
@@ -171,11 +209,11 @@ A deeper look into \gls{can} is conducted in Section \ref{s:can}.
 
 \subsection{Local Interconnect Network}
 
-\gls{lin} is a supplement to the \gls{can} bus, offering lower performance and reliability, but also a much lower cost. It is a product of the \gls{lin} Consortium, founded by BMW, Volkswagen Group, Audi, Volvo Cars Mercedes-Benz, Volcano Automotive Group, and Motorola, and provides cost-efficient communication in applications where the bandwidth and versatility of \gls{can} are not required. This typically includes mechatronic nodes like the vehicle’s windows, wipers, side mirrors, or seat controllers \citep{LIN}.\par
+\gls{lin} is a supplement to the \gls{can} bus, offering lower performance and reliability, but also a much lower cost. It is a product of the \gls{lin} Consortium, founded by BMW, Volkswagen Group, Audi, Volvo Cars Mercedes-Benz, Volcano Automotive Group, and Motorola, and provides cost-efficient communication in applications where the bandwidth and versatility of \gls{can} are not required. This typically includes mechatronic nodes like the vehicle's windows, wipers, side mirrors, or seat controllers \citep{LIN}.\par
 
-The first version of the specification was released in 1999, with updates soon following. \gls{lin} 2.0 was released in 2003 and the protocol was standardised in ISO 17987:2016.\par
+The first version of the specification was released in 1999, with updates soon following. \gls{lin} 2.0 was released in 2003 and the protocol was standardised in \gls{iso} 17987:2016.\par
 
-Unlike \gls{can}, a typical \gls{lin} cluster consists of a single commander node and up to 16 responders connected by a single copper wire, with communication speeds up to 20kbit/s \citep{Takahashi2017}. It is usually deployed as a \gls{can} sub-network, with only the \gls{lin} master node being connected to the \gls{can}-bus. All communications are initiated by the commander node, with one responder replying to a given message identifier (the commander node can also act as a responder, replying to its own messages). There is, therefore, no need to implement collision detection \citep{LIN_CSS}.\par
+Unlike \gls{can}, a typical \gls{lin} cluster consists of a single commander node and up to 16 responders connected by a single copper wire, with communication speeds up to 20 Kb/s \citep{Takahashi2017}. It is usually deployed as a \gls{can} sub-network, with only the \gls{lin} master node being connected to the \gls{can}-bus. All communications are initiated by the commander node, with one responder replying to a given message identifier (the commander node can also act as a responder, replying to its own messages). There is, therefore, no need to implement collision detection \citep{LIN_CSS}.\par
 
 This protocol also implements a sleep and wake-up mechanism, allowing it to potentially save power. Responders can enter sleep via a command issued by the commander node or are forced into that state after more than 4 seconds of \gls{lin} inactivity. The wake-up command can be issued by any node \citep{LIN}.
 We can see in Figure \ref{fig:auto_nodes} that the number of \gls{lin} nodes has recently surpassed the number of \gls{can} nodes.
@@ -187,7 +225,7 @@ We can see in Figure \ref{fig:auto_nodes} that the number of \gls{lin} nodes has
     \label{fig:auto_nodes}
 \end{figure}
 
-There have been recent efforts to study the security aspects of \gls{lin}, such as the one detailed in \citep{Takahashi2017}, and it is noted that due to its link with \gls{can}, the latter’s vulnerabilities are also a cause for concern for the former. \citep{Ernst2018} showed that a compromised \gls{lin} node can destroy as well as create "erroneous, but valid packets". The authors also suggested that the effect of an intrusion can be minimised by the use of appropriate firewalls. However, since \gls{lin} is usually used for non-safety-critical purposes, compromising the bus would most likely not be life-threatening.
+There have been recent efforts to study the security aspects of \gls{lin}, such as the one detailed in \citep{Takahashi2017}, and it is noted that due to its link with \gls{can}, the latter's vulnerabilities are also a cause for concern for the former. \citep{Ernst2018} showed that a compromised \gls{lin} node can destroy as well as create "erroneous, but valid packets". The authors also suggested that the effect of an intrusion can be minimised by the use of appropriate firewalls. However, since \gls{lin} is usually used for non-safety-critical purposes, compromising the bus would most likely not be life-threatening.
 
 \subsection{FlexRay}
 
@@ -383,14 +421,14 @@ Deep learning is a subset of machine learning where the neural networks have mor
 
 There are several metrics used to classify a model's performance. To access if the model will generalise to an independent dataset, cross validation techniques are commonly used. Cross validation consists of a re-sampling method that iterates several times over a given dataset, sampling distinct training and test sets each time. This is particularly useful if the amount of available data is small.\par
 
-For binary classification tasks, the confusion matrix provides several useful performance metrics by laying out true and false positives, as well as true and false negatives in a 2x2 table. Many relevant metrics can be inferred from these values, as shown in Figure \ref{fig:confusion_matrix}. The true-positive rate, also known as recall or sensitivity, provides the rate at which the model detects a truly positive case, while the false-negative rate is the proportion of positive cases missed. The false-positive rate is the probability of the model classifying a negative case as positive, and the true-negative gives the rate at which the model correctly identifies negative cases. Prevalence is the proportion of the dataset that is actually positive, while accuracy tells us how many correct predictions (both positive and negative) the model made in proportion to the total dataset. The positive predictive value metric, or precision, represents the likelihood that a positive prediction is actually positive, with the false discovery rate being its complement. The negative predictive value and false omission rate are analogous. The positive and negative likelihood ratios tell the probability that a classification is actually positive or negative is the model classifies it at such. The diagnostic odds ratio provides a way to measure the model's performance without, unlike accuracy, being affected by prevalence. The F1 score is a function of both precision and recall to give an overall indication of the classifier's performance.
+For binary classification tasks, the confusion matrix provides several useful performance metrics by laying out true and false positives, as well as true and false negatives in a 2x2 table. Many relevant metrics can be inferred from these values, as shown in Table \ref{tab:confusion_matrix}. The true-positive rate, also known as recall or sensitivity, provides the rate at which the model detects a truly positive case, while the false-negative rate is the proportion of positive cases missed. The false-positive rate is the probability of the model classifying a negative case as positive, and the true-negative gives the rate at which the model correctly identifies negative cases. Prevalence is the proportion of the dataset that is actually positive, while accuracy tells us how many correct predictions (both positive and negative) the model made in proportion to the total dataset. The positive predictive value metric, or precision, represents the likelihood that a positive prediction is actually positive, with the false discovery rate being its complement. The negative predictive value and false omission rate are analogous. The positive and negative likelihood ratios tell the probability that a classification is actually positive or negative is the model classifies it at such. The diagnostic odds ratio provides a way to measure the model's performance without, unlike accuracy, being affected by prevalence. The F1 score is a function of both precision and recall to give an overall indication of the classifier's performance.
 
-\begin{figure}
+\begin{table}
     \centering
     \includegraphics[width = .7\textwidth]{img/parts/introduction/Confusion Matrix.png}
     \caption{Components of a confusion matrix \citep{Handelman2019}}
-    \label{fig:confusion_matrix}
-\end{figure}
+    \label{tab:confusion_matrix}
+\end{table}
 
 Another widely used metric for evaluating performance in binary classification tasks is the area under the receiver operating characteristic curve (AUROC). The curve is a graphical plot that illustrates the true-positive versus false-positive rates as the discrimination threshold is varied. A variation in the discrimination threshold usually means a gain in one metric, but a loss in the other, \textit{e.g.} a higher threshold value will decrease the classifier's recall, but increase its precision, and vice-versa. Good performing classifiers will have a large area under the plotted curve.\par
 
@@ -521,48 +559,35 @@ f(z_*) = \text{sgn} \left( \sum_i \alpha_i K(x, z_*) - \rho \right)
 
 The amount of time it takes to run an algorithm dictates whether it can be trained in an online fashion or not. Algorithms that take a long time to process data can easily be overwhelmed by a streaming input, potentially bottlenecking network throughput.\par
 
-Time complexity is typically expressed using big O notation (\textit{e.g.} $O(n)$, $O(n\ log\ n)$, $O(n^2)$), where n is the size in units of bits needed to represent the input. \citep{Buczak2016} state that, as a rule of thumb, the $O(n)$ and $O(n\ log\ n)$ algorithms are considered to be linear time and are usable for online approaches. $O(n^2)$ is considered as acceptable for most practices. $O(n^3)$ and higher are considered to be much slower algorithms and used for offline approaches. Table \ref{tab:algo_comparison} shows a comparison between different algorithms, assuming $n$ to be much larger than $m$. Most machine learning methods have linear time complexity on the testing phase, and can, therefore, be used online.
+Time complexity is typically expressed using big O notation (\textit{e.g.} $O(n)$, $O(n\ log\ n)$, $O(n^2)$), where n is the size in units of bits needed to represent the input. \cite{Buczak2016} state that, as a rule of thumb, the $O(n)$ and $O(n\ log\ n)$ algorithms are considered to be linear time and are usable for online approaches. $O(n^2)$ is considered as acceptable for most practices. $O(n^3)$ and higher are considered to be much slower algorithms and used for offline approaches. Table \ref{tab:algo_comparison} shows a comparison between different algorithms, assuming $n$ to be much larger than $m$. Most machine learning methods have linear time complexity on the testing phase, and can, therefore, be used online.
 
 \begin{table}
+    \scriptsize
     \centering
-    \begin{tabular}{*{4}{|m{.2\textwidth}}|}
-    \hline
+    \begin{tabular}{*{4}{c}}
+    \toprule
     \textbf{Algorithm} & \textbf{Typical Time Complexity} & \textbf{Streaming Capable} & \textbf{Comments}\\
-    \hline\hline
-    Artificial Neural Network & O($emnk$) & low & $e$: number of epochs\newline $k$: number of neurons\\
-    \hline
+    \midrule
+    \multirow{2}{*}{Artificial Neural Network} & \multirow{2}{*}{O($emnk$)} & \multirow{2}{*}{low} & $e$: number of epochs\\
+    &&& $k$: number of neurons\\
     Association Rules & >>O($n^2$) & low &\\
-    \hline
     Bayesian Network & >>O($mn$) & high &\\
-    \hline
-    Clustering, k-means & O($kmni$) & high & $i$: number of iterations until threshold is reached\newline $k$: number of clusters\\
-    \hline
+    \multirow{2}{*}{Clustering, k-means} & \multirow{2}{*}{O($kmni$)} & \multirow{2}{*}{high} & $i$: number of iterations until threshold is reached\\
+    &&& $k$: number of clusters\\
     Clustering, hiearchical & O($n^3$) & low &\\
-    \hline
     Clustering, DBSCAN & O($n \log n$) & high &\\
-    \hline
     Decision Trees & O($mn^2$) & medium &\\
-    \hline
-    GA & O($gkmn$) & medium & $g$: number of generations\newline $k$: population size\\
-    \hline
+    \multirow{2}{*}{GA} & \multirow{2}{*}{O($gkmn$)} & \multirow{2}{*}{medium} & $g$: number of generations\\
+    &&& $k$: population size\\
     Nearest Neighbour k-NN & O($n \log k$) & high & $k$: number of neighbours\\
-    \hline
     \gls{hmm} & O($ne^2$) & medium & $e$: number of states\\
-    \hline
     Random forest & O($Mmn \log n$) & medium & $M$: number of trees\\
-    \hline
     Sequence Mining & >>O($n^3$) & low &\\
-    \hline
     \glspl{svm} & O($n^2$) & medium &\\
-    \hline
+    \bottomrule
     \end{tabular}
     \caption{Complexity comparison of machine learning algorithms during training \citep{Buczak2016}}
     \label{tab:algo_comparison}
-\end{table}
-
-\begin{table}
-    \centering
-    \includegraphics[width = \textwidth]{img/parts/introduction/Algorithm Comparison.png}
 \end{table}
 
 \subsection{Anomaly detection}

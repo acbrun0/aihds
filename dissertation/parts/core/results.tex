@@ -25,7 +25,7 @@ Graphics showing feature behaviour during tests can be seen of Figures \ref{fig:
     \label{tab:perf_car_hacking}
 \end{table}
 
-\section{IEEE Challenge dataset}
+\section{IEEE Car Hacking: Attack \& Defense Challenge 2020}
 
 The model was trained by gathering a baseline from the attack-free datasets in the stationary and driving modes, separately. Twelve IDs were monitored in each state (44E, 164, 260, 140, 541, 386, 490, 366, 367, 563, 4CB, 50E for the stationary state and 44E, 164, 130, 140, 3A0, 386, 490, 366, 367, 563, 4CB, 2B0 for the driving state). To test the IDS' performance, the stationary model was executed on the datasets provided for the preliminary and final round of the competition, and the driving model was executed on the dataset provided for the preliminary round (the final round did not include a dataset for the driving state).\par
 Test results are present in Table \ref{tab:perf_ieee_challenge}. Values in bold were obtained from tests made using the average time between packets, Hamming distance, and entropy. Remaining values exclude entropy. Using only the average time between packets and Hamming distance. However, results for the stationary final and driving tests are above 90\% in both the precision and F1-score metrics, the IDS did not perform so well in the stationary preliminary test. Adding entropy to the set of features reduces the amount of false positives, at the expense of a small increase in the amount of false negatives. However, the IDS performs slightly worse in the other two tests. Still, it may still be considered preferable to use the three features.\par
@@ -45,7 +45,7 @@ Graphics showing feature behaviour during tests can be seen of Figures \ref{fig:
         & \textbf{3.935\%} & \textbf{2.140\%} & \textbf{98.427\%} & \textbf{96.065\%} & \textbf{97.184\%}\\
         \bottomrule
     \end{tabular}
-    \caption{Performance metrics on IEEE Challenge dataset}
+    \caption{Performance metrics on the IEEE Car Hacking: Attack \& Defense Challenge 2020}
     \label{tab:perf_ieee_challenge}
 \end{table}
 
