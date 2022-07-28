@@ -42,12 +42,6 @@ struct Args {
     /// Extracts features to CSV files
     #[clap(long)]
     extract_features: Option<String>,
-    /// Perform grid search optimization on SVM
-    #[clap(long)]
-    grid_search: bool,
-    /// Join features into a single file
-    #[clap(long)]
-    join: bool,
     /// Run model in streaming mode
     #[clap(long)]
     streaming: Option<String>,
