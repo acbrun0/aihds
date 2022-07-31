@@ -1,1 +1,12 @@
 \chapter{Conclusion}
+\label{c:conclusion}
+
+Continuous automotive development has brought forth a new concept of the vehicle. Modern vehicles are capable of running many complex applications, as well as communicating with each other and with road infrastructure. This allows the vehicle to aid the driver through \gls{adas} applications such as lane-assist and adaptive cruise control, as well as gather traffic information and other aspects of its surroundings. Vehicles capable of fully autonomous driving are also in active development.\par
+
+The ability to connect to the exterior significantly raised the risk of attacks compared to when vehicles were self-contained. This new vector of attack motivated a new search for security solutions in the automotive space. One such solution is based on the concept of the \gls{ids}, which has existed in traditional networks for many years. An \gls{ids} analyses network traffic and signals when an attack is ocurring.\par
+
+This dissertation presented an implementation of this concept for the \acrlong{can} using machine learning to perform blind traffic analysis. It uses a combination of packet timing and information-theory algorithms to detect attacks, meaning that it does not need to understand packet syntax. This is relevant because packet syntax is not standardised and is highly proprietary, meaning that the application can therefore be implemented by a variety of manufacturers in a plug-and-play fashion.\par
+
+Although the solution is not without its limitations, it builds upon previous research by combining both packet frequency and information-theoretic metrics into a single machine learning model capable of being executed in real-time in a resource-constrained environment.\par
+
+To make modern vehicles secure, a variety of solutions must come together. This includes \glspl{tpm}, network encryption, and many others. This application is yet another component contributing to achieving this ever-important goal.

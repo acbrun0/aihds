@@ -1,10 +1,13 @@
 \chapter{Application}
+\label{c:application}
+
+This chapter covers the proposed solution and its implementation. In Section \ref{sec:app_architecture}, the overall system is explained, including how feature extraction is performed as well as how the model is trained. Section \ref{sec:app_training} goes into more detail on how the trainig mechanism works. The features used to train the model, and their selection process, are documented in Section \ref{sec:app_features}. In Section \ref{sec:app_embedded}, the system's implementation in an embedded environment is detailed, along with its behaviour regarding resource restriction. Finally, Section \ref{sec:app_exe} shows the application's \gls{cli} and visual interface. The application's full documentation is available in Appendix \ref{apdx:sec:code_documentation}.
 
 \section{IDS architecture}
+\label{sec:app_architecture}
 
 In \ref{sec:ids_detection_approaches}, various approaches to \gls{ids} deployment were presented, most notably its placement (host or network-based) and detection techniques (signature, specification, anomaly, or hybrid). Here, a host-based \gls{ids} for anomaly detection is put forward. Instead of the \gls{ids} residing in a separate \gls{ecu} connected to the network, the \gls{ids} is deployed on all of the vehicle's \glspl{ecu}. It then monitors the same messages as the \gls{ecu} in which it is deployed. Since it would be present on all \glspl{ecu}, an attack on any relevant message ID would, theoretically, trigger at least one alarm. Monitoring a small set of IDs also aids with detection because an anomaly in the behaviour of a certain ID becomes more noticeable in the average of the set when compared to a larger number of IDs being monitored.\par
 Features are extracted from a rolling window with an overlap of 75\% between consecutive windows. Given the same amount of packets, this allows for the extraction of a larger amount of features during the training phase, when compared to non-overlapping windows.\par
-In this chapter, the \gls{ids}' training process is explained, along with how the system is structured. The feature selection process is then described. Finally, the prototype's deployment in an embedded environment is detailed.\par
 A diagram of the overall system can be seen in Figure \ref{fig:ids_architecture}.
 
 \begin{figure}
@@ -15,22 +18,38 @@ A diagram of the overall system can be seen in Figure \ref{fig:ids_architecture}
 \end{figure}
 
 \section{Training}
+\label{sec:app_training}
 
 Training the \gls{ids} can be done both in an online and offline fashion. Training online means that a baseline reading is gathered from live traffic, which must be attack-free to generate an accurate model because attacks are detected based upon significant deviations from the baseline traffic's characteristics. Offline training is done by providing the \gls{ids} with a \gls{csv} file containing CAN traffic that will serve as a baseline.\par
 Features are extracted using a rolling window on the collected traffic, which are then scaled to fit in the [0, 1] interval. The minimum and maximum values of each feature are saved to perform proper feature scaling when the \gls{ids} is deployed.\par
-The kernel method is employed using the Gaussian kernel with $\epsilon = 1$ and the model is trained with the $\nu$ parameter set to 0.01. The \gls{ids} is then saved to the filesystem so it can be recovered upon a system restart, and has the following components:
+The kernel method is employed using the Gaussian kernel with $\epsilon = 1$ and the model is trained with the $\nu$ parameter set to 0.01. The \gls{ids} is then saved to the filesystem so it can be recovered upon a system restart. The documentation for the structure and training function can be seen in Figures \ref{fig:ids_struct} and \ref{fig:ids_train}, respectively.
 
-\begin{itemize}
-    \item \textit{model}: The \gls{ocsvm}
-    \item \textit{scaler}: A vector of tuples containing the minimum and maximum values of each feature from the baseline
-    \item \textit{window}: The collection of packets from which features are extracted
-    \item \textit{size}: The amount of packets the window can hold
-    \item \textit{slide}: The amount of packets that leave and enter the window in a FIFO fashion
-    \item \textit{counter}: The number of packets that have left and entered the window between slides
-    \item \textit{monitor}: The collection of IDs to monitor
-\end{itemize}
+\begin{figure}
+    \centering
+    \includegraphics[width = \linewidth]{img/parts/docs/ids/ids_struct.png}
+    \caption{\gls{ids} structure}
+    \label{fig:ids_struct}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width = \linewidth]{img/parts/docs/ids/ids_struct_train.png}
+    \caption{Training function}
+    \label{fig:ids_train}
+\end{figure}
+
+% \begin{itemize}
+%     \item \textit{model}: The \gls{ocsvm}
+%     \item \textit{scaler}: A vector of tuples containing the minimum and maximum values of each feature from the baseline
+%     \item \textit{window}: The collection of packets from which features are extracted
+%     \item \textit{size}: The amount of packets the window can hold
+%     \item \textit{slide}: The amount of packets that leave and enter the window in a FIFO fashion
+%     \item \textit{counter}: The number of packets that have left and entered the window between slides
+%     \item \textit{monitor}: The collection of IDs to monitor
+% \end{itemize}
 
 \section{Features}
+\label{sec:app_features}
 
 This section focuses on the features extracted from \gls{can} bus traffic that are then used as input to the \gls{ocsvm} model. Prior research on \glspl{ids} that focus on \gls{can} has found success in the use of frequency analysis and information-theoretic algorithms, as shown in Section \ref{sec:can_ids}. Frequency analysis was one of the first methods used to detect packet insertion attacks. Since many packets of the same ID are sent at a consistent interval (typically 10 or 20 milliseconds), a variation of these timings caused by a bad actor inserting packets into the network would be picked up as an anomaly. On the other hand, information-theory may aid in detecting anomalous behaviour caused by packet modification attacks, or packet low-frequency packet insertion.\par
 Here, the proposed features are described, and the feature selection process is presented.
@@ -94,6 +113,7 @@ Figure \ref{fig:fe} shows some illustrative examples of how these features are c
 Thus, after observing several attack types, including with and without packet insertion, the average byte-wise Hamming distance and the average arrival time between packets of the same ID appear to be the most promising in predicting whether an attack is present or not.
 
 \section{Embedded system environment}
+\label{sec:app_embedded}
 
 To simulate the environment where the proposed system would be deployed, the program was written in Rust 1.62.0 and compiled to the ARM v7 architecture to run on a Raspberry Pi 4 Model B connected to the ECU cluster shown in Figure \ref{fig:setup}. Code documentation is available in Appendix \ref{apdx:sec:code_documentation}.\par
 
@@ -105,4 +125,45 @@ It is also important to assure that the algorithm does not consume too much powe
     \includegraphics[width = \linewidth]{img/parts/app/powerdraw.png}
     \caption{Power consumption from the Raspberry Pi while executing the proposed \gls{ids}}
     \label{fig:powerdraw}
+\end{figure}
+
+\section{Execution}
+\label{sec:app_exe}
+
+A \gls{cli} was developed in order to facilitate application testing and deplyment. It consists of the following:
+
+\begin{verbatim}
+USAGE:
+    aihds [OPTIONS]
+
+OPTIONS:
+        --extract-features <EXTRACT_FEATURES>
+            Extracts features to CSV files
+    -h, --help
+            Print help information
+        --live
+            Run IDS in live mode
+        --model <MODEL>
+            Path to model to be loaded
+        --monitor <LIST>
+            IDs to monitor
+        --streaming <URL>
+            Run model in streaming mode
+        --test <PATHS>
+            Paths to the datasets required for testing the model,
+            separated by ','
+        --train <PATHS>
+            Paths to the datasets required for training the model,
+            separated by ','
+    -V, --version
+            Print version information
+\end{verbatim}
+
+Running the application in online mode is done with the \emph{live} option, while the \emph{training} option is used to indicate the file on which offline training will be performed. The \emph{streaming} option sends features and predictions as HTTP requests to the specified \gls{url}. An example of a graphical interface to visually represent the streaming data can be seen on Figure \ref{fig:website}.
+
+\begin{figure}
+    \centering
+    \includegraphics[width = \linewidth]{img/parts/app/website.png}
+    \caption{Graphical interface}
+    \label{fig:website}
 \end{figure}
