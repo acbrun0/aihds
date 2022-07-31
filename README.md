@@ -22,10 +22,7 @@ USAGE:
 
 OPTIONS:
         --extract-features         Extracts features to CSV files
-        --grid-search              Perform grid search optimization on SVM
     -h, --help                     Print help information
-        --join                     Join features into a single file
-        --libsvm                   Use libsvm format
         --live                     Run IDS in live mode
         --model <MODEL>            Path to model to be loaded
         --monitor <MONITOR>        IDs to monitor
@@ -38,6 +35,9 @@ OPTIONS:
 ```
 
 ##### Example
+
+Train with CSV file monitoring IDs A1, B2, C3, and D4
+`./aihds --train baseline.csv --monitor A1,B2,C3,D4`
 
 Run in live mode with a saved model and show data in a server located at _url:port_  
 `./aihds --live --model models/svm --streaming [url:port]`  
