@@ -5,3 +5,7 @@
 /features
 /graphs
 /webapp/node_modules
+
+/article
+/dissertation/**/*.aux
+/dissertation/**/*.loig
