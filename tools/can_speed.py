@@ -2,7 +2,7 @@ import argparse
 import can
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate plot from CSV data.")
+    parser = argparse.ArgumentParser(description="Calculates the average number of packets per second in the CSV file.")
     parser.add_argument("dataset", help="Path to CSV file.")
     args = parser.parse_args()
 

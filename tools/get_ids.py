@@ -2,7 +2,7 @@ import argparse
 import pandas
 
 def main():
-    parser = argparse.ArgumentParser(description="Performe feature selection on dataset.")
+    parser = argparse.ArgumentParser(description="Get set of IDs in dataset.")
     parser.add_argument("dataset", help="Path to CSV file.")
     parser.add_argument("--attack", action="store_true", help="Filter IDs that are attacked.")
     args = parser.parse_args()
