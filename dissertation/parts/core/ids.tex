@@ -1,7 +1,7 @@
 \chapter{Application}
 \label{c:application}
 
-This chapter covers the proposed solution and its implementation. In Section \ref{sec:app_architecture}, the overall system is explained, including how feature extraction is performed as well as how the model is trained. Section \ref{sec:app_training} goes into more detail on how the trainig mechanism works. The features used to train the model, and their selection process, are documented in Section \ref{sec:app_features}. In Section \ref{sec:app_embedded}, the system's implementation in an embedded environment is detailed, along with its behaviour regarding resource restriction. Finally, Section \ref{sec:app_exe} shows the application's \gls{cli} and visual interface. The application's full documentation is available in Appendix \ref{apdx:sec:code_documentation}.
+This chapter covers the proposed \gls{ids} solution and its implementation. In Section \ref{sec:app_architecture}, the overall system is explained, including how feature extraction is performed as well as how the model is trained. Section \ref{sec:app_training} goes into more detail on how the training mechanism works. The features used to train the model, and their selection process, are documented in Section \ref{sec:app_features}. In Section \ref{sec:app_embedded}, the system's implementation in an embedded environment is detailed, along with its behaviour regarding resource restriction. Finally, Section \ref{sec:app_exe} shows the application's \gls{cli} and visual interface. The application's full documentation is available in Appendix \ref{apdx:sec:code_documentation}.
 
 \section{IDS architecture}
 \label{sec:app_architecture}
@@ -70,6 +70,9 @@ An occurrence with probability 1 has no entropy, while a set of occurrences with
 In information theory, the number of points where the matching symbols are different between two strings of equal length is known as the Hamming distance \citep{hamming1950}. For example, the Hamming distance between 0000 and 1111 is 4, while the Hamming distance between 0101 and 1101 is 1. The formula for evaluating the Hamming distance between two words of length $k$ is \[H_d(x, y) = \sum_{i = 1}^{k} \vert x_i - y_i \vert\]\par
 
 Here, the proposed approach consists on calculating the Hamming distance between consecutive packets in the network, similar to what was proposed by \cite{stabili2017}. The authors formulated this as being \[H_d(p_t, p_{t + 1}) = \sum_{i = 1}^{k} p_{t}^{i} \otimes p_{t + 1}^{i}\] where $p_t$ is a generic payload at time $t$ and $p_t^i$ is the $i_{th}$ element of that payload.
+
+Both bit and byte-wise calculations were explored in the development of this prototype. An example of a bit-wise Hamming distance calculation is \[H_bit(0000000\ 000110100, 00111111\ 00000100) = 8\]
+and the same operation performed byte-wise is \[H_byte(00\ 34, 3F\ 04) = 2\]
 
 \subsection{Difference between bytes}
 

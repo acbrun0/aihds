@@ -1,0 +1,105 @@
+This is BibTeX, Version 0.99d
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: dissertation.aux
+Reallocating 'name_of_file' (item size: 1) to 9 items.
+The style file: plainnat.bst
+Reallocating 'name_of_file' (item size: 1) to 15 items.
+A level-1 auxiliary file: parts/acks.aux
+Reallocating 'name_of_file' (item size: 1) to 14 items.
+A level-1 auxiliary file: parts/soi.aux
+Reallocating 'name_of_file' (item size: 1) to 19 items.
+A level-1 auxiliary file: parts/abstract.aux
+Reallocating 'name_of_file' (item size: 1) to 17 items.
+A level-1 auxiliary file: parts/resumo.aux
+Reallocating 'name_of_file' (item size: 1) to 29 items.
+A level-1 auxiliary file: parts/introduction/intro.aux
+Reallocating 'name_of_file' (item size: 1) to 34 items.
+A level-1 auxiliary file: parts/introduction/background.aux
+Reallocating 'name_of_file' (item size: 1) to 28 items.
+A level-1 auxiliary file: parts/introduction/sota.aux
+Reallocating 'name_of_file' (item size: 1) to 24 items.
+A level-1 auxiliary file: parts/core/datasets.aux
+Reallocating 'name_of_file' (item size: 1) to 19 items.
+A level-1 auxiliary file: parts/core/ids.aux
+Reallocating 'name_of_file' (item size: 1) to 23 items.
+A level-1 auxiliary file: parts/core/results.aux
+Reallocating 'name_of_file' (item size: 1) to 32 items.
+A level-1 auxiliary file: parts/conclusion/futurework.aux
+Reallocating 'name_of_file' (item size: 1) to 32 items.
+A level-1 auxiliary file: parts/conclusion/conclusion.aux
+Reallocating 'name_of_file' (item size: 1) to 8 items.
+Reallocating 'name_of_file' (item size: 1) to 37 items.
+A level-1 auxiliary file: parts/appendix/feature_selection.aux
+Reallocating 'name_of_file' (item size: 1) to 26 items.
+A level-1 auxiliary file: parts/appendix/graphs.aux
+Reallocating 'name_of_file' (item size: 1) to 24 items.
+A level-1 auxiliary file: parts/appendix/docs.aux
+Reallocating 'name_of_file' (item size: 1) to 25 items.
+A level-1 auxiliary file: parts/appendix/tools.aux
+Database file #1: library.bib
+Warning--to sort, need author or key in JavaTpoint_SVM
+Warning--to sort, need author or key in autosar
+Warning--to sort, need author or key in IBM_ParatericStatistics
+Warning--empty year in JavaTpoint_SVM
+Warning--empty year in autosar
+Warning--empty year in autosar_adaptive_arch
+Warning--empty year in can
+Warning--empty year in DSPA
+Warning--empty journal in Dupont2019
+Warning--empty year in MOSTVector
+Warning--empty year in CiACANXL
+Warning--empty year in sspiConnectedCar
+Warning--empty author in ISO21434
+Warning--empty author in ISO26262
+Warning--empty year in crysys
+Warning--empty year in infector
+Warning--empty year in Maltby
+Warning--empty year in MOSTMicrochip
+Warning--empty year in PRESERVE
+Warning--empty author in SAEJ3061
+Warning--empty year in Scikit-learn-novelty_detection
+Warning--empty year in AvgPhoneAge
+Warning--empty booktitle in Studnia2013
+Warning--empty year in autosar_arch
+You've used 119 entries,
+            2773 wiz_defined-function locations,
+            1320 strings with 28470 characters,
+and the built_in function-call counts, 53947 in all, are:
+= -- 4889
+> -- 3074
+< -- 82
++ -- 1065
+- -- 942
+* -- 4153
+:= -- 8121
+add.period$ -- 438
+call.type$ -- 119
+change.case$ -- 684
+chr.to.int$ -- 115
+cite$ -- 265
+duplicate$ -- 2482
+empty$ -- 4486
+format.name$ -- 1079
+if$ -- 11572
+int.to.chr$ -- 5
+int.to.str$ -- 1
+missing$ -- 74
+newline$ -- 664
+num.names$ -- 432
+pop$ -- 1501
+preamble$ -- 1
+purify$ -- 558
+quote$ -- 0
+skip$ -- 1911
+stack$ -- 0
+substring$ -- 1422
+swap$ -- 381
+text.length$ -- 30
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 1304
+warning$ -- 24
+while$ -- 432
+width$ -- 0
+write$ -- 1641
+(There were 24 warnings)

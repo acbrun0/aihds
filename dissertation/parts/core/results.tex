@@ -1,9 +1,12 @@
 \chapter{Results}
 \label{c:results}
 
+Performance tests were performed in the datasets layed out in Chapter \ref{c:datasets}. These aim to show how the system performs in different environments and subject to a variety of attacks. Five metrics are used to evaluate system performance: False Negative (FN) rate, error rate, precision, recall, and F1-score (see \ref{subsec:performance_metrics}).\par
+Values in bold were obtained when using three features as input to the model: average time between packets, entropy, and Hamming distance. The remaining values were obtained using only the average time between packets and Hamming distance.
+
 \section{Car Hacking Dataset}
 
-Tests were made monitoring the IDs 350, 130, 131, 140, 2c2, 2b0, 316, 18f, 43f, and 440. The gear spoofing attack targets the ID 43f, and the RPM gauge spoofing attack targets the ID 316. Results are shown in Table \ref{tab:perf_car_hacking}. Values in bold were obtained when using three features as input to the model: average time between packets, entropy, and Hamming distance. The remaining values were obtained using only the average time between packets and Hamming distance.\par
+Tests were made monitoring the IDs 350, 130, 131, 140, 2c2, 2b0, 316, 18f, 43f, and 440. The gear spoofing attack targets the ID 43f, and the RPM gauge spoofing attack targets the ID 316. Results are shown in Table \ref{tab:perf_car_hacking}.\par
 When using only two features, the F1-score for both spoofing attacks are above 90\%. However, the occurrence of false positives remains high. Including entropy wields generally better results. Although the rate of false negatives is slightly worse, both precision and F1-score show bigger improvements. The fuzzing attack is harder to detect in both cases.\par
 Graphics showing feature behaviour during tests can be seen of Figures \ref{fig:extract_carhacking_dos}, \ref{fig:extract_carhacking_fuzzy}, \ref{fig:extract_carhacking_gear}, and \ref{fig:extract_carhacking_rpm}.
 
@@ -28,7 +31,7 @@ Graphics showing feature behaviour during tests can be seen of Figures \ref{fig:
 \section{IEEE Car Hacking: Attack \& Defense Challenge 2020}
 
 The model was trained by gathering a baseline from the attack-free datasets in the stationary and driving modes, separately. Twelve IDs were monitored in each state (44E, 164, 260, 140, 541, 386, 490, 366, 367, 563, 4CB, 50E for the stationary state and 44E, 164, 130, 140, 3A0, 386, 490, 366, 367, 563, 4CB, 2B0 for the driving state). To test the IDS' performance, the stationary model was executed on the datasets provided for the preliminary and final round of the competition, and the driving model was executed on the dataset provided for the preliminary round (the final round did not include a dataset for the driving state).\par
-Test results are present in Table \ref{tab:perf_ieee_challenge}. Values in bold were obtained from tests made using the average time between packets, Hamming distance, and entropy. Remaining values exclude entropy. Using only the average time between packets and Hamming distance. However, results for the stationary final and driving tests are above 90\% in both the precision and F1-score metrics, the IDS did not perform so well in the stationary preliminary test. Adding entropy to the set of features reduces the amount of false positives, at the expense of a small increase in the amount of false negatives. However, the IDS performs slightly worse in the other two tests. Still, it may still be considered preferable to use the three features.\par
+Test results are present in Table \ref{tab:perf_ieee_challenge}. Results for the stationary final and driving tests are above 90\% in both the precision and F1-score metrics. The IDS, however, did not perform so well in the stationary preliminary test. Adding entropy to the set of features reduces the amount of false positives, at the expense of a small increase in the amount of false negatives. The IDS performs slightly worse in the other two tests. Still, it may be preferable to use the three features.\par
 Graphics showing feature behaviour during tests can be seen of Figures \ref{fig:extract_ieee_d}, \ref{fig:extract_ieee_s_s}, and \ref{fig:extract_ieee_s_f}.
 
 \begin{table}
@@ -87,7 +90,7 @@ Graphics showing feature behaviour during tests can be seen of Figures \ref{fig:
 
 \section{CrySyS Lab}
 
-Table \ref{tab:perf_crysys} shows the results of the tests performed on the CrySyS Lab dataset and the generated modification attacks, as described in \ref{sec:dataset_crysys}. Tests were made monitoring 10 IDs (110, 120, 140, 180, 1A0, 280, 290, 295, 300, and 301) and only the attacked ID (120), also with and without entropy values. Values obtained from tests that included entropy as part of the feature set are displayed in bold.
+Table \ref{tab:perf_crysys} shows the results of the tests performed on the CrySyS Lab dataset and the generated modification attacks, as described in \ref{sec:dataset_crysys}. Tests were made monitoring 10 IDs (110, 120, 140, 180, 1A0, 280, 290, 295, 300, and 301) and only the attacked ID (120).
 
 \begin{table}
     \centering

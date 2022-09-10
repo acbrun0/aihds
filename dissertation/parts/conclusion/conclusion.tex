@@ -1,6 +1,16 @@
 \chapter{Conclusion}
 \label{c:conclusion}
 
+\section{Limitations and Future Work}
+
+Because of the lightweight nature of the proposed solution, it could become overloaded if the number of messages being analysed is too high. Currently, this is alleviated by monitoring only a subset of IDs per application instance. However, as automotive applications become more complex, and as network throughput increases, scalability issues may arise. Alternatives such as different network metrics to monitor may be investigated as a potential solution, as well as a possible replacement to the method of averaging the features concerning different IDs to obtain a single value.\par
+
+Another limitation in detecting an anomaly relies in the fact that attacks that span only some messages go largely undetected. This is because the deviation from normal behaviour caused by such a small number of anomalous messages is not enough to cause a significant alteration in the features of the window being analysed.\par
+
+Traditionally, the training phase of machine learning includes some kind of hyperparameter tuning. However, there is no hyperparameter tuning for the \gls{ocsvm} here implemented, with the hyperparameter values being hard-coded. This is because traditional tuning algorithms rely on validation and testing datasets to evaluate model performance, but this would not apply to a real-world scenario where the model is trained only with attack-free data. The inclusion of such a process in the training phase would likely increase performance.
+
+\section{Summary}
+
 Continuous automotive development has brought forth a new concept of the vehicle. Modern vehicles are capable of running many complex applications, as well as communicating with each other and with road infrastructure. This allows the vehicle to aid the driver through \gls{adas} applications such as lane-assist and adaptive cruise control, as well as gather traffic information and other aspects of its surroundings. Vehicles capable of fully autonomous driving are also in active development.\par
 
 The ability to connect to the exterior significantly raised the risk of attacks compared to when vehicles were self-contained. This new vector of attack motivated a new search for security solutions in the automotive space. One such solution is based on the concept of the \gls{ids}, which has existed in traditional networks for many years. An \gls{ids} analyses network traffic and signals when an attack is ocurring.\par
