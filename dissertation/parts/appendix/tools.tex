@@ -1,3 +1,8 @@
+\chapter{Auxiliary code}
+\label{apdx:sec:tools}
+
+Below is the set of auxiliary Python scripts that assisted throughout various part of the application's development.
+
 \section{CAN Speed}
 
 Calculates the average number of packets per second in the CSV file.
@@ -36,7 +41,6 @@ def main():
     parser.add_argument("dataset", help="Path to CSV file.")
     args = parser.parse_args()
     dataset = pandas.read_csv(args.dataset)
-
     plt.figure(figsize=(15, 10))
     seaborn.heatmap(dataset.corr(), annot=True)
     plt.savefig(f"graphs/{Path(args.dataset).stem}.png")
@@ -225,7 +229,6 @@ def main():
     parser.add_argument("dataset", help="Path to CSV file.")
     args = parser.parse_args()
     Path("graphs").mkdir(exist_ok=True)
-    
     dataframe = pd.read_csv(args.dataset)
     figure(figsize=(20, 5))
     plt.plot(np.arange(0, dataframe.shape[0]), dataframe["Current(mA)"])

@@ -71,8 +71,8 @@ In information theory, the number of points where the matching symbols are diffe
 
 Here, the proposed approach consists on calculating the Hamming distance between consecutive packets in the network, similar to what was proposed by \cite{stabili2017}. The authors formulated this as being \[H_d(p_t, p_{t + 1}) = \sum_{i = 1}^{k} p_{t}^{i} \otimes p_{t + 1}^{i}\] where $p_t$ is a generic payload at time $t$ and $p_t^i$ is the $i_{th}$ element of that payload.
 
-Both bit and byte-wise calculations were explored in the development of this prototype. An example of a bit-wise Hamming distance calculation is \[H_bit(0000000\ 000110100, 00111111\ 00000100) = 8\]
-and the same operation performed byte-wise is \[H_byte(00\ 34, 3F\ 04) = 2\]
+Both bit and byte-wise calculations were explored in the development of this prototype. An example of a bit-wise Hamming distance calculation is \[H_{bit}(0000000\ 000110100, 00111111\ 00000100) = 8\]
+and the same operation performed byte-wise is \[H_{byte}(00\ 34, 3F\ 04) = 2\]
 
 \subsection{Difference between bytes}
 
@@ -118,7 +118,7 @@ Thus, after observing several attack types, including with and without packet in
 \section{Embedded system environment}
 \label{sec:app_embedded}
 
-To simulate the environment where the proposed system would be deployed, the program was written in Rust 1.62.0 and compiled to the ARM v7 architecture to run on a Raspberry Pi 4 Model B connected to the ECU cluster shown in Figure \ref{fig:setup}. Code documentation is available in Appendix \ref{apdx:sec:code_documentation}.\par
+To simulate the environment where the proposed system would be deployed, the program was written in Rust 1.62.0 and compiled to the ARM v7 architecture to run on a Raspberry Pi 4 Model B connected to the ECU cluster shown in Figure \ref{fig:setup}. Code documentation is available in Appendix \ref{apdx:sec:code_documentation}, with additional Python tools that assisted in development being detailed in Appendix \ref{apdx:sec:tools}.\par
 
 To verify if the system would be able to analyse real-time traffic, the number of packets per second it was able to process was recorded. This came at around 1600. However, it was unclear whether this was a bottleneck or if it was the real network throughput. To clear this, traffic was logged onto a \gls{csv} file and processed by the Raspberry Pi as if it was live traffic, but read from memory instead of a network socket. The average number of packets per second processed came at 39,195.426, while the average number of packets per second in the log file was 1,678.878. The proposed system should therefore be able to perform real-time analysis in an embedded environment. CPU usage was recorded as being 5\%, signalling that its implementation in a real ECU would not raise serious concerns about resource usage.\par
 It is also important to assure that the algorithm does not consume too much power, as it would reduce the overall range of the vehicle. Figure \ref{fig:powerdraw} shows how much current the Raspberry Pi was drawing while executing the \gls{ids}. Applied voltage was constant at 4900mV. The baseline current was established to be at 400mA, and it rose up to 500mA when the \gls{ids} was executing. This comes at 0.5W, which is negligible.
