@@ -1,8 +1,0 @@
-\chapter{Limitations and future work}
-\label{c:limitations}
-
-Because of the lightweight nature of the proposed solution, it could become overloaded if the number of messages being analysed is too high. Currently, this is alleviated by monitoring only a subset of IDs per application instance. However, as automotive applications become more complex, and as network throughput increases, scalability issues may arise. Alternatives such as different network metrics to monitor may be investigated as a potential solution, as well as a possible replacement to the method of averaging the features concerning different IDs to obtain a single value.\par
-
-Another limitation in detecting an anomaly relies in the fact that attacks that span only some messages go largely undetected. This is because the deviation from normal behaviour caused by such a small number of anomalous messages is not enough to cause a significant alteration in the features of the window being analysed.\par
-
-Traditionally, the training phase of machine learning includes some kind of hyperparameter tuning. However, there is no hyperparameter tuning for the \gls{ocsvm} here implemented, with the hyperparameter values being hard-coded. This is because traditional tuning algorithms rely on validation and testing datasets to evaluate model performance, but this would not apply to a real-world scenario where the model is trained only with attack-free data. The inclusion of such a process in the training phase would likely increase performance.
